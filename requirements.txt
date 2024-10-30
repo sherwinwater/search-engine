@@ -1,3 +1,9 @@
 Flask==3.0.3
 
 flask-cors==5.0.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+rank-bm25==0.2.2
+PyPDF2 ==3.0.1
+tqdm ==4.65.0
+validators==0.34.0
