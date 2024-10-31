@@ -9,8 +9,6 @@ from statistics import mean
 from db.database import SearchEngineDatabase
 from utils.setup_logging import setup_logging
 
-logger = setup_logging(__name__)
-
 class HTMLScraper:
     def __init__(self, base_url, output_dir, task_id=None):
         parsed_url = urlparse(base_url)
@@ -24,6 +22,8 @@ class HTMLScraper:
         self.downloaded_files = []
         self.downloaded_urls = set()
         self.db = SearchEngineDatabase()
+
+        self.logger = setup_logging(__name__,task_id)
 
         current_time = time.time()
 
@@ -172,7 +172,7 @@ class HTMLScraper:
 
         # Skip non-HTML resource links and anchors
         skip_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.svg', '.css',
-                           '.js', '.ico', '.mp3', '.mp4', '.pdf', '.xml',
+                           '.js', '.ico', '.mp3', '.mp4', '.xml',
                            '.json', '.woff', '.woff2', '.ttf', '.eot'}
         if any(url.lower().endswith(ext) for ext in skip_extensions):
             return False
@@ -247,13 +247,11 @@ class HTMLScraper:
             return self.extract_links(soup, response.url)
 
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                # logger.info(f"Page not found: {url},removed from visited_urls")
-                self.visited_urls.remove(url)
-            else:
-                logger.error(f"Error analyzing {url}: {str(e)}")
+            self.visited_urls.remove(url)
+            return set()
         except Exception as e:
-            logger.error(f"Error analyzing {url}: {str(e)}")
+            self.logger.error(f"Error analyzing {url}: {str(e)}")
+            self.visited_urls.remove(url)
             return set()
 
     def analyze_site(self, max_workers=5):
@@ -280,7 +278,7 @@ class HTMLScraper:
                                     if url not in self.visited_urls
                                 )
                         except Exception as e:
-                            logger.error(f"Error processing batch: {str(e)}")
+                            self.logger.error(f"Error processing batch: {str(e)}")
 
                     self.update_status(
                         message=f"Analysis progress: {len(self.visited_urls)} pages found",
@@ -296,7 +294,7 @@ class HTMLScraper:
             return len(self.visited_urls) > 0
 
         except Exception as e:
-            logger.error(f"Analysis failed: {str(e)}")
+            self.logger.error(f"Analysis failed: {str(e)}")
             self.update_status('failed', f"Analysis failed: {str(e)}")
             return False
 
@@ -342,7 +340,7 @@ class HTMLScraper:
             # Check if URL has already been downloaded
             if url in self.downloaded_urls:
                 self.status['download']['skipped_downloads'] += 1
-                # logger.info(f"Skipping already downloaded URL: {url}")
+                # self.logger.info(f"Skipping already downloaded URL: {url}")
                 return True
 
             response = self.session.get(url, timeout=10)
@@ -356,7 +354,7 @@ class HTMLScraper:
 
             if os.path.exists(file_path):
                 self.status['download']['skipped_downloads'] += 1
-                # logger.info(f"File already exists: {file_path}")
+                # self.logger.info(f"File already exists: {file_path}")
                 self.downloaded_urls.add(url)
                 return True
 
@@ -390,7 +388,7 @@ class HTMLScraper:
                 total_processed / total_pages * 100 if total_pages > 0 else 0
             )
 
-            logger.info(f"Successfully downloaded: {url}")
+            self.logger.info(f"Successfully downloaded: {url}")
             return True
 
         except Exception as e:
@@ -400,7 +398,7 @@ class HTMLScraper:
                 'error': str(e),
                 'timestamp': time.time()
             })
-            logger.error(f"Error downloading {url}: {str(e)}")
+            self.logger.error(f"Error downloading {url}: {str(e)}")
             return False
         finally:
             # Remove URL from current batch
@@ -477,7 +475,7 @@ class HTMLScraper:
             }, 200
 
         except Exception as e:
-            logger.error(f"Download process failed: {str(e)}")
+            self.logger.error(f"Download process failed: {str(e)}")
             self.update_status('failed', f"Download process failed: {str(e)}")
             return {"error": str(e)}, 500
 
@@ -487,40 +485,40 @@ if __name__ == "__main__":
 
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
-    logger.info(f"Created output directory: {output_dir}")
+    self.logger.info(f"Created output directory: {output_dir}")
 
     scraper = HTMLScraper(base_url, output_dir, task_id="test")
 
     # Log analysis progress
-    logger.info("Starting site analysis...")
+    self.logger.info("Starting site analysis...")
     analysis_result = scraper.analyze_site(max_workers=10)
     scraper.calculate_analysis_results(scraper.status['analysis']['completion_time']-scraper.status['analysis']['start_time'])
-    logger.info(f"Analysis completed. Found {len(scraper.visited_urls)} URLs")
-    logger.info(f"status: {scraper.status}")
+    self.logger.info(f"Analysis completed. Found {len(scraper.visited_urls)} URLs")
+    self.logger.info(f"status: {scraper.status}")
 
     if analysis_result:
         # Log URLs found
-        logger.info("URLs found:")
+        self.logger.info("URLs found:")
         for url in scraper.visited_urls:
-            logger.info(f" - {url}")
+            self.logger.info(f" - {url}")
 
         # Start download
-        logger.info("Starting download process...")
+        self.logger.info("Starting download process...")
         result, status_code = scraper.download_all(max_workers=10)
 
         # Log download results
         if status_code == 200:
-            logger.info("Download completed successfully:")
-            logger.info(f" - Total URLs: {result['total_urls']}")
-            logger.info(f" - Successfully downloaded: {result['successful_downloads']}")
-            logger.info(f" - Skipped: {result['skipped_downloads']}")
-            logger.info(f" - Failed: {result['failed_downloads']}")
+            self.logger.info("Download completed successfully:")
+            self.logger.info(f" - Total URLs: {result['total_urls']}")
+            self.logger.info(f" - Successfully downloaded: {result['successful_downloads']}")
+            self.logger.info(f" - Skipped: {result['skipped_downloads']}")
+            self.logger.info(f" - Failed: {result['failed_downloads']}")
 
             if result['failed_downloads'] > 0:
-                logger.error("Failed URLs:")
+                self.logger.error("Failed URLs:")
                 for failed in result['failed_urls']:
-                    logger.error(f" - {failed['url']}: {failed['error']}")
+                    self.logger.error(f" - {failed['url']}: {failed['error']}")
         else:
-            logger.error(f"Download process failed: {result.get('error', 'Unknown error')}")
+            self.logger.error(f"Download process failed: {result.get('error', 'Unknown error')}")
     else:
-        logger.error("No pages found to analyze!")
+        self.logger.error("No pages found to analyze!")
