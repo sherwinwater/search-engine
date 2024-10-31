@@ -12,7 +12,7 @@ def setup_logging(name: Optional[str] = None, task_id: Optional[str] = None) -> 
         logging.Logger: Configured logger instance
     """
     # Use the passed name or default to root logger
-    logger = logging.getLogger(f"{name}.{task_id}" if task_id else name)
+    logger = logging.getLogger(f"{name} - {task_id}" if task_id else name)
     logger.setLevel(logging.INFO)
 
     # Create a filter to inject task_id into LogRecord
@@ -24,7 +24,7 @@ def setup_logging(name: Optional[str] = None, task_id: Optional[str] = None) -> 
     # Create and configure handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(task_id)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
 
     # Add filter to handler
