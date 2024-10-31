@@ -23,7 +23,7 @@ class HTMLScraper:
         self.downloaded_urls = set()
         self.db = SearchEngineDatabase()
 
-        self.logger = setup_logging(__name__,task_id)
+        self.logger = setup_logging(name=f"{__name__}", task_id=task_id)
 
         current_time = time.time()
 

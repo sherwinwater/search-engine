@@ -12,17 +12,13 @@ def setup_logging(name: Optional[str] = None, task_id: Optional[str] = None) -> 
         logging.Logger: Configured logger instance
     """
     # Use the passed name or default to root logger
-    logger = logging.getLogger(name)
+    logger = logging.getLogger(f"{name}.{task_id}" if task_id else name)
     logger.setLevel(logging.INFO)
 
     # Create a filter to inject task_id into LogRecord
     class TaskFilter(logging.Filter):
-        def __init__(self, task_id):
-            super().__init__()
-            self.task_id = task_id
-
         def filter(self, record):
-            record.task_id = self.task_id or 'NO_TASK'
+            record.task_id = task_id or 'NO_TASK'
             return True
 
     # Create and configure handler
@@ -32,7 +28,7 @@ def setup_logging(name: Optional[str] = None, task_id: Optional[str] = None) -> 
     console_handler.setFormatter(formatter)
 
     # Add filter to handler
-    task_filter = TaskFilter(task_id)
+    task_filter = TaskFilter()
     console_handler.addFilter(task_filter)
 
     # Only add handler if it hasn't been added before
