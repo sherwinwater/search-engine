@@ -1,9 +1,16 @@
+import argparse
+import logging
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import threading
 import uuid
 import os
 import validators
+from flask_socketio import SocketIO
+from threading import Lock
+from datetime import datetime
+from collections import deque
 
 from db.database import SearchEngineDatabase
 from service.build_text_index import BuildTextIndex
@@ -11,15 +18,42 @@ from service.scrape_web import HTMLScraper
 from service.text_search import TextSearch
 from utils.convert_numpy_types import convert_numpy_types
 from utils.json_serialize import prepare_scraper_status_for_json, prepare_index_status_for_json
-from utils.setup_logging import setup_logging
+from utils.setup_logging import setup_logging, SocketIOLogHandler
 
 app = Flask(__name__)
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=None,
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+)
+
+log_lock = Lock()
+socket_handler = SocketIOLogHandler.init_handler(socketio)
 logger = setup_logging(__name__)
+
+@socketio.on('connect')
+def handle_connect():
+    logger.info('Client connected')
+
+@socketio.on('join')
+def handle_join(task_id):
+    # Join the room for this task_id
+    socketio.emit('status', {'message': f'Joined room {task_id}'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info('Client disconnected')
+
+
 @app.route("/health")
 def home():
+    logger.info("Health check OK")
     data = {
         "message": "Hello, World!",
         "status": "success"
@@ -58,9 +92,9 @@ def background_building_index(docs_dir: str, task_id: str):
 @app.route('/api/scrape_web', methods=['GET'])
 def scrape_web():
     """Start web scraping task."""
+    db = SearchEngineDatabase()
     url = request.args.get('url')
-    # Match existing error format exactly
-    print(url)
+
     if not url:
         return jsonify({
             "error": "URL parameter is required"
@@ -71,6 +105,13 @@ def scrape_web():
         return jsonify({
             "error": f"Invalid URL format: {url}"
         }), 400
+
+    existing_task = db.get_web_scraping_data_by_url(url)
+    if existing_task:
+        return jsonify({
+            "task_id": existing_task['task_id'],
+            "message": "URL was already scraped"
+        }), 200
 
     max_workers = int(request.args.get('max_workers', 10))
 
@@ -145,7 +186,39 @@ def build_text_index(task_id):
         }), 202
     finally:
         db.close()
+@app.route('/api/build_text_index/local', methods=['GET'])
+def build_text_index_with_local_data():
+    """Get the status of a scraping task."""
+    docs_dir = request.args.get('docs_dir')
+    if not docs_dir:
+        return jsonify({
+            "error": "URL parameter is required"
+        }), 400
 
+    try:
+        docs_dir_name = docs_dir.split("/")[-1]
+        task_id = f"{docs_dir_name}_{str(uuid.uuid4())}"
+
+        # Start background thread
+        thread = threading.Thread(
+            target=background_building_index,
+            args=(docs_dir, task_id)
+        )
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            "task_id": task_id,
+            "message": "Building text index",
+            "status_endpoint": f"/build_text_index_status/{task_id}"
+        }), 202
+    except Exception as e:
+        logger.error(f"Building text index error for task {task_id}: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": "Internal server error",
+            "error": str(e)
+        }), 500
 
 
 @app.route('/api/build_text_index_status/<task_id>', methods=['GET'])
@@ -220,3 +293,18 @@ def search_text(task_id):
             "message": "Internal server error",
             "error": str(e)
         }), 500
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--host', default='127.0.0.1')
+    parser.add_argument('--port', type=int, default=5009)
+    args = parser.parse_args()
+
+    socketio.run(
+        app,
+        host=args.host,
+        port=args.port,
+        debug=True,
+        allow_unsafe_werkzeug=True  # Only in development
+    )

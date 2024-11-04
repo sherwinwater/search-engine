@@ -9,6 +9,7 @@ from utils.setup_logging import setup_logging
 
 logger = setup_logging(__name__)
 
+
 class ThreadSafeDB:
     def __init__(self, db_name):
         self.db_name = db_name
@@ -30,6 +31,7 @@ class ThreadSafeDB:
             del self._local.connection
         if hasattr(self._local, 'cursor'):
             del self._local.cursor
+
 
 class SearchEngineDatabase:
     def __init__(self, db_name='search_engine.db'):
@@ -217,6 +219,27 @@ class SearchEngineDatabase:
                 conn.rollback()
             return False
 
+    def get_web_scraping_data_by_url(self, url):
+        """Get complete task status including all scraper data"""
+        try:
+            # Get a new connection for this thread if needed
+            cursor = self.thread_safe_db.get_cursor()
+            base_path = os.path.dirname(url)
+
+            # Get task data
+            cursor.execute('SELECT * FROM tasks WHERE base_path = ?', (base_path,))
+            task_data = cursor.fetchone()
+
+            if task_data:
+                return {
+                    'task_id': task_data[0],
+                    'exists': True
+                }
+            return None
+        except sqlite3.Error as e:
+            logger.error(f"Database error: {e}")
+            return None
+
     def get_web_scraping_status(self, task_id):
         """Get complete task status including all scraper data"""
         try:
@@ -334,7 +357,6 @@ class SearchEngineDatabase:
                 conn.rollback()
             return False
 
-
     def get_building_text_index_status(self, task_id: str):
         """Get text index building status"""
         try:
@@ -386,7 +408,6 @@ class SearchEngineDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error retrieving building status: {e}")
             return []
-
 
     def close(self):
         """Close all thread-local connections"""

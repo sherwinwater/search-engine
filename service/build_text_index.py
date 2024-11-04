@@ -13,8 +13,6 @@ import PyPDF2
 from db.database import SearchEngineDatabase
 from utils.setup_logging import setup_logging
 
-logger = setup_logging(__name__)
-
 
 class BuildTextIndex:
     def __init__(self, docs_dir: str, task_id: str):
@@ -24,8 +22,10 @@ class BuildTextIndex:
         self.tokenized_docs = None
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        self.index_path = os.path.join(parent_dir, "index_data", f"{docs_dir.split('/')[-1]}.pkl")
+        self.index_path = os.path.join(parent_dir, "index_data", f"{task_id}.pkl")
         self.stop_words_path = os.path.join(os.path.dirname(__file__), "stopwords.txt")
+        
+        self.logger = setup_logging(name=f"{__name__}", task_id=task_id)
 
         self.load_stopwords(self.stop_words_path)
         self.task_id = task_id
@@ -85,13 +85,14 @@ class BuildTextIndex:
                     text.append(page.extract_text())
             return self.clean_text(' '.join(text))
         except Exception as e:
-            logger.info(f"Error extracting text from PDF {pdf_path}: {str(e)}")
+            self.logger.info(f"Error extracting text from PDF {pdf_path}: {str(e)}")
             return ""
 
     def process_file(self, filepath: str) -> Optional[Dict]:
         """Process a single file and return its content and metadata."""
         try:
             relative_path = os.path.relpath(filepath, self.docs_dir)
+            filename = os.path.basename(filepath)
 
             if filepath.lower().endswith('.pdf'):
                 text_content = self.extract_text_from_pdf(filepath)
@@ -106,17 +107,18 @@ class BuildTextIndex:
                 return {
                     'content': text_content,
                     'filepath': relative_path,
+                    'filename': filename,
                     'type': 'pdf' if filepath.lower().endswith('.pdf') else 'html'
                 }
             return None
 
         except Exception as e:
-            logger.info(f"Error processing {filepath}: {str(e)}")
+            self.logger.info(f"Error processing {filepath}: {str(e)}")
             return None
 
     def load_documents(self):
         """Load and process all supported documents."""
-        logger.info("Loading and processing documents...")
+        self.logger.info("Loading and processing documents...")
         for root, _, files in os.walk(self.docs_dir):
             for file in tqdm(files):
                 if file.lower().endswith(('.html', '.pdf')):
@@ -125,7 +127,7 @@ class BuildTextIndex:
                     if doc:
                         self.documents.append(doc)
 
-        logger.info(f"Loaded {len(self.documents)} documents")
+        self.logger.info(f"Loaded {len(self.documents)} documents")
 
     def build_index(self):
         """Build the search index from documents."""
@@ -166,10 +168,10 @@ class BuildTextIndex:
                     doc = self.process_file(str(file_path))
                     if doc and doc['content'].strip():
                         documents.append(doc)
-                    logger.info(f"Processing file {file_path}...progress: {i}/{self.total_files} ({i / self.total_files * 100:.2f}%)")
+                    self.logger.info(f"Processing file {file_path}...progress: {i}/{self.total_files} ({i / self.total_files * 100:.2f}%)")
 
                 except Exception as e:
-                    logger.error(f"Error processing file {file_path}: {e}")
+                    self.logger.error(f"Error processing file {file_path}: {e}")
                     self.failed_files += 1
                     self.error = f"Error processing file {file_path}: {e}"
 
@@ -210,7 +212,7 @@ class BuildTextIndex:
 
         except Exception as e:
             error_msg = f"Error building index: {str(e)}"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             self.status = 'failed'
             self.message = error_msg
             self.error = error_msg
@@ -226,7 +228,7 @@ class BuildTextIndex:
         """Save the search index and processed documents to a file."""
         if not self.bm25:
             error_msg = "Index not built. Call build_index() first."
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             self.status = 'failed'
             self.message = error_msg
             self.error = error_msg
@@ -249,7 +251,7 @@ class BuildTextIndex:
                 text_index=self
             )
 
-            logger.info(f"Saving index to {self.index_path}...")
+            self.logger.info(f"Saving index to {self.index_path}...")
 
             # Ensure directory exists
             os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
@@ -274,11 +276,11 @@ class BuildTextIndex:
                 text_index=self
             )
 
-            logger.info("Index saved successfully")
+            self.logger.info("Index saved successfully")
 
         except Exception as e:
             error_msg = f"Error saving index: {str(e)}"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             self.status = 'failed'
             self.message = error_msg
             self.error = error_msg
@@ -296,14 +298,14 @@ class BuildTextIndex:
             # Check database first
             index_info = self.db.get_building_text_index_status(self.task_id)
             if not index_info:
-                logger.warning(f"No index information found for task {self.task_id}")
+                self.logger.warning(f"No index information found for task {self.task_id}")
                 return False
 
             if not os.path.exists(index_info['index_path']):
-                logger.warning(f"Index file not found at {index_info['index_path']}")
+                self.logger.warning(f"Index file not found at {index_info['index_path']}")
                 return False
 
-            logger.info(f"Loading index from {index_info['index_path']}...")
+            self.logger.info(f"Loading index from {index_info['index_path']}...")
             with open(index_info['index_path'], 'rb') as f:
                 data = pickle.load(f)
 
@@ -311,11 +313,11 @@ class BuildTextIndex:
             self.tokenized_docs = data['tokenized_docs']
             self.bm25 = data['bm25']
 
-            logger.info("Index loaded successfully")
+            self.logger.info("Index loaded successfully")
             return True
 
         except Exception as e:
-            logger.error(f"Error loading index: {e}")
+            self.logger.error(f"Error loading index: {e}")
             return False
 
 
@@ -328,17 +330,17 @@ def main():
 
     # Check if saved index exists
     if os.path.exists(buildTextIndex.index_path):
-        logger.info("Found existing index file.")
+        self.logger.info("Found existing index file.")
         try:
             buildTextIndex.load_index()
         except Exception as e:
-            logger.info(f"Error loading index: {e}")
-            logger.info("Building new index...")
+            self.logger.info(f"Error loading index: {e}")
+            self.logger.info("Building new index...")
             buildTextIndex.load_documents()
             buildTextIndex.build_index()
             buildTextIndex.save_index()
     else:
-        logger.info("No existing index found. Building new index...")
+        self.logger.info("No existing index found. Building new index...")
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
         buildTextIndex.save_index()

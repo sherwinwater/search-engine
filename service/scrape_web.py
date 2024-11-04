@@ -208,30 +208,35 @@ class HTMLScraper:
 
     def analyze_page(self, url):
         """Analyze a single page without downloading."""
+        self.logger.info(f"Starting analysis of page: {url}")
+
         if url in self.visited_urls:
+            self.logger.debug(f"Skipping already visited URL: {url}")
             return set()
 
         self.visited_urls.add(url)
 
         try:
             start_time = time.time()
-
+            self.logger.debug(f"Sending HEAD request to: {url}")
             head_response = self.session.head(url, timeout=5)
             content_type = head_response.headers.get('Content-Type', '').lower()
 
             if 'text/html' not in content_type:
+                self.logger.debug(f"Skipping non-HTML content type: {content_type} for {url}")
                 return set()
 
+            self.logger.debug(f"Sending GET request to: {url}")
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
 
             request_time = time.time() - start_time
             page_size = len(response.content) / 1024  # Convert to KB
 
+            self.logger.info(f"Successfully analyzed {url} - Size: {page_size:.2f}KB, Time: {request_time:.2f}s")
+
             self.request_times.append(request_time)
             self.page_sizes.append(page_size)
-
-
 
             soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -244,9 +249,12 @@ class HTMLScraper:
                 }
             )
 
-            return self.extract_links(soup, response.url)
+            links = self.extract_links(soup, response.url)
+            self.logger.info(f"Found {len(links)} new links on page {url}")
+            return links
 
         except requests.exceptions.HTTPError as e:
+            self.logger.error(f"HTTP Error analyzing {url}: {str(e)}")
             self.visited_urls.remove(url)
             return set()
         except Exception as e:
@@ -256,16 +264,21 @@ class HTMLScraper:
 
     def analyze_site(self, max_workers=5):
         """Analyze the site structure and estimate download requirements."""
+        self.logger.info(f"Starting site analysis with {max_workers} workers")
         self.status['analysis']['start_time'] = time.time()
         self.update_status('analyzing', 'Analyzing site structure...')
 
         try:
             urls_to_process = {self.base_path}
+            self.logger.info(f"Initial URL to process: {self.base_path}")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 while urls_to_process:
                     batch = list(urls_to_process)[:max_workers]
                     urls_to_process = set(list(urls_to_process)[max_workers:])
+
+                    self.logger.info(f"Processing batch of {len(batch)} URLs")
+                    self.logger.debug(f"Current batch: {batch}")
 
                     futures = [executor.submit(self.analyze_page, url) for url in batch]
 
@@ -273,13 +286,13 @@ class HTMLScraper:
                         try:
                             new_urls = future.result()
                             if new_urls is not None:
-                                urls_to_process.update(
-                                    url for url in new_urls
-                                    if url not in self.visited_urls
-                                )
+                                new_unvisited_urls = {url for url in new_urls if url not in self.visited_urls}
+                                urls_to_process.update(new_unvisited_urls)
+                                self.logger.debug(f"Added {len(new_unvisited_urls)} new URLs to processing queue")
                         except Exception as e:
                             self.logger.error(f"Error processing batch: {str(e)}")
 
+                    self.logger.info(f"Analysis progress: {len(self.visited_urls)} pages found, {len(urls_to_process)} in queue")
                     self.update_status(
                         message=f"Analysis progress: {len(self.visited_urls)} pages found",
                         analysis={
@@ -290,6 +303,9 @@ class HTMLScraper:
 
             self.status['analysis']['completion_time'] = time.time()
             analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
+            self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
+            self.logger.info(f"Total pages found: {len(self.visited_urls)}")
+
             self.calculate_analysis_results(analysis_time)
             return len(self.visited_urls) > 0
 
@@ -298,19 +314,38 @@ class HTMLScraper:
             self.update_status('failed', f"Analysis failed: {str(e)}")
             return False
 
-
     def calculate_analysis_results(self, analysis_time):
         """Calculate and store analysis results."""
+        self.logger.info("Starting analysis results calculation")
         total_pages = len(self.visited_urls)
 
         if not total_pages:
+            self.logger.error("Analysis failed: No HTML pages found to analyze!")
             self.update_status('failed', 'No HTML pages found to analyze!')
             return
 
+        # Calculate basic metrics
         avg_page_size = mean(self.page_sizes)
         total_size_kb = sum(self.page_sizes)
         avg_request_time = mean(self.request_times)
         estimated_total_time = avg_request_time * total_pages
+
+        # Log basic metrics
+        self.logger.info(f"Analysis Metrics:")
+        self.logger.info(f"- Total Pages: {total_pages}")
+        self.logger.info(f"- Average Page Size: {round(avg_page_size, 2)} KB")
+        self.logger.info(f"- Total Size: {round(total_size_kb, 2)} KB ({round(total_size_kb / 1024, 2)} MB)")
+        self.logger.info(f"- Average Request Time: {round(avg_request_time, 2)} seconds")
+        self.logger.info(f"- Analysis Time: {round(analysis_time, 2)} seconds")
+
+        # Log estimated completion times
+        self.logger.info("Estimated Completion Times:")
+        self.logger.info(f"- Sequential: {round(estimated_total_time / 60, 2)} minutes")
+        self.logger.info(f"- With 5 workers: {round(estimated_total_time / 5 / 60, 2)} minutes")
+        self.logger.info(f"- With 10 workers: {round(estimated_total_time / 10 / 60, 2)} minutes")
+
+        # Log URL statistics
+        self.logger.debug(f"Discovered URLs: {sorted(list(self.visited_urls))}")
 
         self.update_status(
             message='Analysis completed',
@@ -329,7 +364,7 @@ class HTMLScraper:
                 'discovered_urls': sorted(list(self.visited_urls))
             }
         )
-
+        self.logger.info("Analysis results calculation completed")
     def download_page(self, url):
         """Download and save a single HTML page."""
         try:

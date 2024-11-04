@@ -143,7 +143,9 @@ class TextSearch:
                         'metadata': doc['metadata'],
                         'score': float(scores[idx]),
                         'document_id': doc['id'],
-                        'position': idx  # Add position in the original document list
+                        'position': idx,
+                        'filename': doc.get('filename', ''),  # Add filename to results
+                        'filepath': doc.get('filepath', '')
                     }
                     results.append(result)
 
