@@ -1,5 +1,4 @@
 import argparse
-import logging
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -7,10 +6,8 @@ import threading
 import uuid
 import os
 import validators
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room, leave_room
 from threading import Lock
-from datetime import datetime
-from collections import deque
 
 from db.database import SearchEngineDatabase
 from service.build_text_index import BuildTextIndex
@@ -27,28 +24,52 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode=None,
+    async_mode='threading',
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1e8,
+    manage_session=False
 )
 
 log_lock = Lock()
 socket_handler = SocketIOLogHandler.init_handler(socketio)
 logger = setup_logging(__name__)
 
+active_connections = {}
+
 @socketio.on('connect')
 def handle_connect():
-    logger.info('Client connected')
+    sid = request.sid
+    active_connections[sid] = set()  # Initialize empty set for room membership
+    logger.info(f'Client connected: {sid}')
 
 @socketio.on('join')
 def handle_join(task_id):
-    # Join the room for this task_id
-    socketio.emit('status', {'message': f'Joined room {task_id}'})
+    sid = request.sid
+    try:
+        join_room(task_id)
+        active_connections[sid].add(task_id)
+        logger.info(f'Client {sid} joined room {task_id}')
+        socketio.emit('status', {'message': f'Joined room {task_id}'}, room=task_id)
+    except Exception as e:
+        logger.error(f'Error joining room: {str(e)}')
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    logger.info('Client disconnected')
+    sid = request.sid
+    if sid in active_connections:
+        # Leave all rooms this client was in
+        for room in active_connections[sid]:
+            leave_room(room)
+            socketio.emit('status', {'message': f'Client left room {room}'}, room=room)
+        del active_connections[sid]
+    logger.info(f'Client disconnected: {sid}')
+
+def emit_log(task_id, message):
+    """Utility function to emit logs to a specific task room"""
+    socketio.emit('log_message', {'message': message}, room=task_id)
 
 
 @app.route("/health")
@@ -297,7 +318,7 @@ def search_text(task_id):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='127.0.0.1')
+    parser.add_argument('--host', default='0.0.0.0')
     parser.add_argument('--port', type=int, default=5009)
     args = parser.parse_args()
 
