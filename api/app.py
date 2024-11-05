@@ -1,4 +1,5 @@
 import argparse
+import json
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -127,12 +128,12 @@ def scrape_web():
             "error": f"Invalid URL format: {url}"
         }), 400
 
-    existing_task = db.get_web_scraping_data_by_url(url)
-    if existing_task:
-        return jsonify({
-            "task_id": existing_task['task_id'],
-            "message": "URL was already scraped"
-        }), 200
+    # existing_task = db.get_web_scraping_data_by_url(url)
+    # if existing_task:
+    #     return jsonify({
+    #         "task_id": existing_task['task_id'],
+    #         "message": "URL was already scraped"
+    #     }), 200
 
     max_workers = int(request.args.get('max_workers', 10))
 
@@ -172,6 +173,12 @@ def get_scrape_web_status(task_id):
             }), 404
 
         scraper = prepare_scraper_status_for_json(scraper)
+
+        if scraper.get('status') == 'completed':
+            webpage_graph_file = scraper.get('webpage_graph_file')
+            if webpage_graph_file:
+                with open(webpage_graph_file, 'r') as f:
+                    scraper['webpage_graph'] = json.load(f)
 
         return jsonify(scraper)
     finally:

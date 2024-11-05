@@ -65,6 +65,7 @@ class SearchEngineDatabase:
                     downloaded_urls TEXT,  -- Stored as JSON array
                     status TEXT,
                     message TEXT,
+                    webpage_graph_file TEXT,
                     start_time REAL,
                     is_completed BOOLEAN,
                     completion_time REAL
@@ -151,8 +152,8 @@ class SearchEngineDatabase:
                     task_id, domain, base_path, output_dir,
                     visited_urls, page_sizes, request_times,
                     downloaded_files, downloaded_urls,
-                    status, message, start_time, is_completed, completion_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, message, start_time, is_completed, completion_time,webpage_graph_file
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
             ''', (
                 task_id,
                 scraper.domain,
@@ -167,7 +168,8 @@ class SearchEngineDatabase:
                 scraper.status['message'],
                 scraper.status['start_time'],
                 scraper.status['is_completed'],
-                scraper.status['completion_time']
+                scraper.status['completion_time'],
+                scraper.status['webpage_graph_file']
             ))
 
             # Insert/update analysis
@@ -246,61 +248,65 @@ class SearchEngineDatabase:
             # Get a new connection for this thread if needed
             cursor = self.thread_safe_db.get_cursor()
 
-            # Get task data
+            # Get all raw data first
             cursor.execute('SELECT * FROM tasks WHERE task_id = ?', (task_id,))
-            task_data = cursor.fetchone()
-            print(task_id)
-            if not task_data:
-                print("----none")
+            task_row = cursor.fetchone()
+            if not task_row:
                 return None
+
+            # Convert row to dictionary but handle JSON fields specially
+            result = {
+                'task_id': task_row[0],
+                'domain': task_row[1],
+                'base_path': task_row[2],
+                'output_dir': task_row[3],
+                'visited_urls': set(json.loads(task_row[4])) if task_row[4] else set(),
+                'page_sizes': json.loads(task_row[5]) if task_row[5] else {},
+                'request_times': json.loads(task_row[6]) if task_row[6] else {},
+                'downloaded_files': json.loads(task_row[7]) if task_row[7] else [],
+                'downloaded_urls': set(json.loads(task_row[8])) if task_row[8] else set(),
+                'status': task_row[9],
+                'message': task_row[10],
+                'webpage_graph_file': task_row[11],
+                'start_time': task_row[12],
+                'is_completed': bool(task_row[13]),
+                'completion_time': task_row[14]
+            }
 
             # Get analysis data
             cursor.execute('SELECT * FROM analysis WHERE task_id = ?', (task_id,))
-            analysis_data = cursor.fetchone()
+            analysis_row = cursor.fetchone()
+            if analysis_row:
+                result['analysis'] = {
+                    'pages_found': analysis_row[1],
+                    'urls_in_queue': analysis_row[2],
+                    'average_page_size': analysis_row[3],
+                    'total_size_kb': analysis_row[4],
+                    'average_request_time': analysis_row[5],
+                    'start_time': analysis_row[6],
+                    'completion_time': analysis_row[7]
+                }
 
             # Get download data
             cursor.execute('SELECT * FROM downloads WHERE task_id = ?', (task_id,))
-            download_data = cursor.fetchone()
+            download_row = cursor.fetchone()
+            if download_row:
+                result['download'] = {
+                    'total_pages': download_row[1],
+                    'downloaded_pages': download_row[2],
+                    'successful_downloads': download_row[3],
+                    'failed_downloads': download_row[4],
+                    'skipped_downloads': download_row[5],
+                    'current_batch': json.loads(download_row[6]) if download_row[6] else [],
+                    'failed_urls': json.loads(download_row[7]) if download_row[7] else [],
+                    'progress_percentage': download_row[8],
+                    'start_time': download_row[9],
+                    'completion_time': download_row[10],
+                    'is_completed': bool(download_row[11])
+                }
 
-            # Reconstruct complete status
-            return {
-                'task_id': task_data[0],
-                'domain': task_data[1],
-                'base_path': task_data[2],
-                'output_dir': task_data[3],
-                'visited_urls': json.loads(task_data[4]),  # Return as list, not set
-                'page_sizes': json.loads(task_data[5]),
-                'request_times': json.loads(task_data[6]),
-                'downloaded_files': json.loads(task_data[7]),
-                'downloaded_urls': json.loads(task_data[8]),  # Return as list, not set
-                'status': task_data[9],
-                'message': task_data[10],
-                'start_time': task_data[11],
-                'is_completed': bool(task_data[12]),
-                'completion_time': task_data[13],
-                'analysis': {
-                    'pages_found': analysis_data[1],
-                    'urls_in_queue': analysis_data[2],
-                    'average_page_size': analysis_data[3],
-                    'total_size_kb': analysis_data[4],
-                    'average_request_time': analysis_data[5],
-                    'start_time': analysis_data[6],
-                    'completion_time': analysis_data[7]
-                } if analysis_data else {},
-                'download': {
-                    'total_pages': download_data[1],
-                    'downloaded_pages': download_data[2],
-                    'successful_downloads': download_data[3],
-                    'failed_downloads': download_data[4],
-                    'skipped_downloads': download_data[5],
-                    'current_batch': json.loads(download_data[6]),
-                    'failed_urls': json.loads(download_data[7]),
-                    'progress_percentage': download_data[8],
-                    'start_time': download_data[9],
-                    'completion_time': download_data[10],
-                    'is_completed': bool(download_data[11])
-                } if download_data else {}
-            }
+            return result
+
         except sqlite3.Error as e:
             logger.error(f"Database error: {e}")
             return None

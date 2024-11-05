@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import os
 from urllib.parse import urljoin, urlparse
 import time
+import json
 from concurrent.futures import ThreadPoolExecutor
 from statistics import mean
 
@@ -23,6 +24,15 @@ class HTMLScraper:
         self.downloaded_urls = set()
         self.db = SearchEngineDatabase()
 
+        self.webpage_graph_file = os.path.join(self.output_dir, 'webpage_graph.json')
+
+        # Graph related structures
+        self.graph_data = {
+            'nodes': [],
+            'links': []
+        }
+        self.url_to_id = {}
+
         self.logger = setup_logging(name=f"{__name__}", task_id=task_id)
 
         current_time = time.time()
@@ -31,6 +41,7 @@ class HTMLScraper:
         self.status = {
             'status': 'initiated',
             'message': 'Scraper initialized',
+            'webpage_graph_file': self.webpage_graph_file,
             'start_time': current_time,
             'is_completed': False,
             'completion_time': None,
@@ -55,12 +66,47 @@ class HTMLScraper:
                 'start_time': None,
                 'completion_time': None,
                 'is_completed': False
+            },
+            'graph': {
+                'total_nodes': 0,
+                'total_edges': 0,
+                'graph_file': None
             }
         }
 
         # Store initial status in database
         if self.task_id:
             self.db.update_scraping_task(self.task_id, self)
+
+    def get_url_id(self, url):
+        """Generate a unique ID for a URL."""
+        if url in self.url_to_id:
+            return self.url_to_id[url]
+        new_id = str(len(self.url_to_id) + 1)
+        self.url_to_id[url] = new_id
+        return new_id
+
+    def extract_page_title(self, soup):
+        """Extract page title from BeautifulSoup object."""
+        if soup.title:
+            return soup.title.string
+        h1 = soup.find('h1')
+        if h1:
+            return h1.get_text()
+        return None
+
+    def save_graph_data(self):
+        """Save the graph data to a JSON file."""
+        graph_file = os.path.join(self.output_dir, 'webpage_graph.json')
+        try:
+            os.makedirs(os.path.dirname(graph_file), exist_ok=True)
+            with open(graph_file, 'w', encoding='utf-8') as f:
+                json.dump(self.graph_data, f, indent=2)
+            self.logger.info(f"Graph data saved to {graph_file}")
+            return graph_file
+        except Exception as e:
+            self.logger.error(f"Error saving graph data: {str(e)}")
+            return None
 
     def update_status(self, status=None, message=None, **kwargs):
         """Update scraper status and any additional fields."""
@@ -207,7 +253,7 @@ class HTMLScraper:
         return links
 
     def analyze_page(self, url):
-        """Analyze a single page without downloading."""
+        """Analyze a single page and collect graph data."""
         self.logger.info(f"Starting analysis of page: {url}")
 
         if url in self.visited_urls:
@@ -215,6 +261,7 @@ class HTMLScraper:
             return set()
 
         self.visited_urls.add(url)
+        url_id = self.get_url_id(url)
 
         try:
             start_time = time.time()
@@ -231,7 +278,7 @@ class HTMLScraper:
             response.raise_for_status()
 
             request_time = time.time() - start_time
-            page_size = len(response.content) / 1024  # Convert to KB
+            page_size = len(response.content) / 1024
 
             self.logger.info(f"Successfully analyzed {url} - Size: {page_size:.2f}KB, Time: {request_time:.2f}s")
 
@@ -239,6 +286,17 @@ class HTMLScraper:
             self.page_sizes.append(page_size)
 
             soup = BeautifulSoup(response.text, 'html.parser')
+            title = self.extract_page_title(soup) or url
+
+            # Add node to graph data
+
+            node = {
+                'id': url_id,
+                'url': url,
+                'title': title
+            }
+            if node not in self.graph_data['nodes']:
+                self.graph_data['nodes'].append(node)
 
             # Update analysis metrics
             self.update_status(
@@ -250,20 +308,39 @@ class HTMLScraper:
             )
 
             links = self.extract_links(soup, response.url)
+
+            # Add edges to graph data
+            for link in links:
+                if link not in self.url_to_id:
+                    link_id = self.get_url_id(link)
+                else:
+                    link_id = self.url_to_id[link]
+
+                edge = {
+                    'source': url_id,
+                    'target': link_id
+                }
+                if edge not in self.graph_data['links']:
+                    self.graph_data['links'].append(edge)
+
             self.logger.info(f"Found {len(links)} new links on page {url}")
             return links
 
         except requests.exceptions.HTTPError as e:
             self.logger.error(f"HTTP Error analyzing {url}: {str(e)}")
             self.visited_urls.remove(url)
+            if url in self.url_to_id:
+                del self.url_to_id[url]
             return set()
         except Exception as e:
             self.logger.error(f"Error analyzing {url}: {str(e)}")
             self.visited_urls.remove(url)
+            if url in self.url_to_id:
+                del self.url_to_id[url]
             return set()
 
     def analyze_site(self, max_workers=5):
-        """Analyze the site structure and estimate download requirements."""
+        """Analyze the site structure and create graph data."""
         self.logger.info(f"Starting site analysis with {max_workers} workers")
         self.status['analysis']['start_time'] = time.time()
         self.update_status('analyzing', 'Analyzing site structure...')
@@ -301,19 +378,52 @@ class HTMLScraper:
                         }
                     )
 
+            # Save graph data and update status
+            self.save_graph_data()
+            self.status['graph'].update({
+                'total_nodes': len(self.graph_data['nodes']),
+                'total_edges': len(self.graph_data['links']),
+                'graph_file': self.webpage_graph_file
+            })
+
             self.status['analysis']['completion_time'] = time.time()
             analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
             self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
             self.logger.info(f"Total pages found: {len(self.visited_urls)}")
 
             self.calculate_analysis_results(analysis_time)
-            return len(self.visited_urls) > 0
+            return self.visited_urls
 
         except Exception as e:
             self.logger.error(f"Analysis failed: {str(e)}")
             self.update_status('failed', f"Analysis failed: {str(e)}")
-            return False
+            return []
 
+    def deduplicate_graph_data(self):
+        """Deduplicate nodes and edges in graph data."""
+        # Use dictionaries to ensure unique nodes by ID
+        unique_nodes = {}
+        for node in self.graph_data['nodes']:
+            unique_nodes[node['id']] = node
+
+        # Use a set with frozenset to ensure unique edges
+        seen_edges = set()
+        unique_edges = []
+        for edge in self.graph_data['links']:
+            # Create an immutable set of source and target for comparison
+            edge_pair = frozenset([edge['source'], edge['target']])
+            if edge_pair not in seen_edges:
+                seen_edges.add(edge_pair)
+                unique_edges.append(edge)
+
+        return {
+            'nodes': list(unique_nodes.values()),
+            'links': unique_edges,
+            'metadata': self.graph_data.get('metadata', {})
+        }
+    def get_graph_data(self):
+        """Return the current graph data."""
+        return self.graph_data
     def calculate_analysis_results(self, analysis_time):
         """Calculate and store analysis results."""
         self.logger.info("Starting analysis results calculation")
@@ -348,6 +458,7 @@ class HTMLScraper:
         self.logger.debug(f"Discovered URLs: {sorted(list(self.visited_urls))}")
 
         self.update_status(
+            status='analysis_completed',
             message='Analysis completed',
             analysis={
                 'total_pages': total_pages,
@@ -514,46 +625,203 @@ class HTMLScraper:
             self.update_status('failed', f"Download process failed: {str(e)}")
             return {"error": str(e)}, 500
 
+    def save_graph_data(self):
+        """Save the graph data to a JSON file."""
+        self.graph_data = self.deduplicate_graph_data()
+
+        try:
+            # Create the graph data structure
+            graph_data = {
+                'nodes': self.graph_data['nodes'],
+                'links': self.graph_data['links'],
+                'metadata': {
+                    'domain': self.domain,
+                    'base_path': self.base_path,
+                    'total_nodes': len(self.graph_data['nodes']),
+                    'total_links': len(self.graph_data['links']),
+                    'timestamp': time.time(),
+                    'analysis_time': self.status['analysis'].get('analysis_time_seconds'),
+                    'success_rate': self.status['download'].get('success_rate', 0)
+                }
+            }
+
+            # Save with pretty printing
+            with open(self.webpage_graph_file, 'w', encoding='utf-8') as f:
+                json.dump(graph_data, f, indent=2, ensure_ascii=False)
+
+            self.logger.info(f"Graph data saved successfully to {self.webpage_graph_file }")
+
+            # Update status
+            self.status['graph'].update({
+                'total_nodes': len(self.graph_data['nodes']),
+                'total_edges': len(self.graph_data['links']),
+                'graph_file': self.webpage_graph_file
+            })
+
+        except Exception as e:
+            self.logger.error(f"Error saving graph data: {str(e)}")
+            return None
+
+    def load_graph_data(self, file_path=None):
+        """Load graph data from JSON file."""
+        try:
+            if file_path is None:
+                file_path = os.path.join(self.output_dir, 'webpage_graph.json')
+
+            if not os.path.exists(file_path):
+                self.logger.error(f"Graph file not found: {file_path}")
+                return False
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Update graph data
+            self.graph_data['nodes'] = data['nodes']
+            self.graph_data['links'] = data['links']
+
+            # Rebuild URL to ID mapping
+            self.url_to_id = {node['url']: node['id'] for node in data['nodes']}
+
+            # Update status
+            self.status['graph'].update({
+                'total_nodes': len(self.graph_data['nodes']),
+                'total_edges': len(self.graph_data['links']),
+                'graph_file': file_path
+            })
+
+            self.logger.info(f"Graph data loaded successfully from {file_path}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error loading graph data: {str(e)}")
+            return False
+
+    def export_graph_summary(self):
+        """Export a summary of the graph data."""
+        try:
+            summary = {
+                'statistics': {
+                    'total_pages': len(self.graph_data['nodes']),
+                    'total_links': len(self.graph_data['links']),
+                    'average_outgoing_links': len(self.graph_data['links']) / len(self.graph_data['nodes']) if self.graph_data['nodes'] else 0
+                },
+                'top_pages': {
+                    'most_linked': self._get_most_linked_pages(5),
+                    'most_outgoing': self._get_pages_with_most_outgoing_links(5)
+                },
+                'domain_info': {
+                    'domain': self.domain,
+                    'base_path': self.base_path
+                }
+            }
+
+            summary_file = os.path.join(self.output_dir, 'graph_summary.json')
+            with open(summary_file, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2, ensure_ascii=False)
+
+            self.logger.info(f"Graph summary exported to {summary_file}")
+            return summary_file
+
+        except Exception as e:
+            self.logger.error(f"Error exporting graph summary: {str(e)}")
+            return None
+
+    def _get_most_linked_pages(self, limit=5):
+        """Get pages with most incoming links."""
+        incoming_links = {}
+        for link in self.graph_data['links']:
+            target = link['target']
+            incoming_links[target] = incoming_links.get(target, 0) + 1
+
+        # Get top pages
+        top_pages = sorted(incoming_links.items(), key=lambda x: x[1], reverse=True)[:limit]
+
+        # Get page details
+        return [{
+            'id': page_id,
+            'url': next((node['url'] for node in self.graph_data['nodes'] if node['id'] == page_id), None),
+            'title': next((node['title'] for node in self.graph_data['nodes'] if node['id'] == page_id), None),
+            'incoming_links': count
+        } for page_id, count in top_pages]
+
+    def _get_pages_with_most_outgoing_links(self, limit=5):
+        """Get pages with most outgoing links."""
+        outgoing_links = {}
+        for link in self.graph_data['links']:
+            source = link['source']
+            outgoing_links[source] = outgoing_links.get(source, 0) + 1
+
+        # Get top pages
+        top_pages = sorted(outgoing_links.items(), key=lambda x: x[1], reverse=True)[:limit]
+
+        # Get page details
+        return [{
+            'id': page_id,
+            'url': next((node['url'] for node in self.graph_data['nodes'] if node['id'] == page_id), None),
+            'title': next((node['title'] for node in self.graph_data['nodes'] if node['id'] == page_id), None),
+            'outgoing_links': count
+        } for page_id, count in top_pages]
+
 if __name__ == "__main__":
-    base_url = "https://storm.apache.org/releases/2.7.0/index.html"
+    base_url = "https://courses.grainger.illinois.edu/cs425/fa2024/assignments.html"
+    # base_url = "https://storm.apache.org/releases/2.7.0/index.html"
+    # base_url = "https://visjs.github.io/vis-network/docs/network/index.html"
+    # base_url = "https://d3js.org/d3-force"
     output_dir = "../test/scraped_data"
+
+    logger = setup_logging(name=f"{__name__}", task_id="test")
 
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
-    self.logger.info(f"Created output directory: {output_dir}")
+    logger.info(f"Created output directory: {output_dir}")
 
     scraper = HTMLScraper(base_url, output_dir, task_id="test")
 
     # Log analysis progress
-    self.logger.info("Starting site analysis...")
+    logger.info("Starting site analysis...")
     analysis_result = scraper.analyze_site(max_workers=10)
     scraper.calculate_analysis_results(scraper.status['analysis']['completion_time']-scraper.status['analysis']['start_time'])
-    self.logger.info(f"Analysis completed. Found {len(scraper.visited_urls)} URLs")
-    self.logger.info(f"status: {scraper.status}")
+    logger.info(f"Analysis completed. Found {len(scraper.visited_urls)} URLs")
+    logger.info(f"status: {scraper.status}")
 
     if analysis_result:
+        # Print graph statistics
+        graph_data = scraper.get_graph_data()
+        print("\nGraph Analysis Results:")
+        print(f"Total Pages (Nodes): {len(graph_data['nodes'])}")
+        print(f"Total Links (Edges): {len(graph_data['links'])}")
+
+        # Print sample of nodes
+        print("\nSample Nodes:")
+        for node in graph_data['nodes'][:5]:
+            print(f"- {node['title']} ({node['url']})")
+
+        print("\nSample Links:")
+        for link in graph_data['links'][:5]:
+            print(f"- {link['source']} -> {link['target']}")
+
         # Log URLs found
-        self.logger.info("URLs found:")
+        logger.info("URLs found:")
         for url in scraper.visited_urls:
-            self.logger.info(f" - {url}")
+            logger.info(f" - {url}")
 
-        # Start download
-        self.logger.info("Starting download process...")
-        result, status_code = scraper.download_all(max_workers=10)
-
-        # Log download results
-        if status_code == 200:
-            self.logger.info("Download completed successfully:")
-            self.logger.info(f" - Total URLs: {result['total_urls']}")
-            self.logger.info(f" - Successfully downloaded: {result['successful_downloads']}")
-            self.logger.info(f" - Skipped: {result['skipped_downloads']}")
-            self.logger.info(f" - Failed: {result['failed_downloads']}")
-
-            if result['failed_downloads'] > 0:
-                self.logger.error("Failed URLs:")
-                for failed in result['failed_urls']:
-                    self.logger.error(f" - {failed['url']}: {failed['error']}")
-        else:
-            self.logger.error(f"Download process failed: {result.get('error', 'Unknown error')}")
+        # # Start download
+        # logger.info("Starting download process...")
+        # result, status_code = scraper.download_all(max_workers=10)
+        #
+        # # Log download results
+        # if status_code == 200:
+        #     logger.info("Download completed successfully:")
+        #     logger.info(f" - Total URLs: {result['total_urls']}")
+        #     logger.info(f" - Successfully downloaded: {result['successful_downloads']}")
+        #     logger.info(f" - Skipped: {result['skipped_downloads']}")
+        #     logger.info(f" - Failed: {result['failed_downloads']}")
+        #
+        #     if result['failed_downloads'] > 0:
+        #         logger.error("Failed URLs:")
+        #         for failed in result['failed_urls']:
+        #             logger.error(f" - {failed['url']}: {failed['error']}")
+        # else:
+        #     logger.error(f"Download process failed: {result.get('error', 'Unknown error')}")
     else:
-        self.logger.error("No pages found to analyze!")
+        logger.error("No pages found to analyze!")

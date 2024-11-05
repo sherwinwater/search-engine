@@ -9,6 +9,7 @@ def prepare_scraper_status_for_json(status_data):
         'status': status_data.get('status'),
         'message': status_data.get('message'),
         'data_location': status_data.get('output_dir'),
+        'webpage_graph_file': status_data.get('webpage_graph_file'),
         'is_completed': status_data.get('is_completed'),
         'downloaded_urls': list(status_data.get('downloaded_urls', set())),
         # 'downloaded_files': status_data.get('downloaded_files') or [],
