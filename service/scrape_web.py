@@ -23,6 +23,8 @@ class HTMLScraper:
         self.downloaded_files = []
         self.downloaded_urls = set()
         self.db = SearchEngineDatabase()
+        self.file_paths = {}  # Add this to track file paths for URLs
+
 
         self.webpage_graph_file = os.path.join(self.output_dir, 'webpage_graph.json')
 
@@ -85,6 +87,17 @@ class HTMLScraper:
         new_id = str(len(self.url_to_id) + 1)
         self.url_to_id[url] = new_id
         return new_id
+
+    def get_relative_path(self, url):
+        """Generate relative path for a URL and extract base filename."""
+        relative_path = url.replace(self.domain, '').lstrip('/')
+        if not os.path.splitext(relative_path)[1]:
+            relative_path = os.path.join(relative_path, 'index.html')
+            base_filename = 'index.html'
+        else:
+            base_filename = os.path.basename(relative_path)  # This will get just 'edges.html' from the path
+
+        return relative_path, base_filename
 
     def extract_page_title(self, soup):
         """Extract page title from BeautifulSoup object."""
@@ -262,6 +275,7 @@ class HTMLScraper:
 
         self.visited_urls.add(url)
         url_id = self.get_url_id(url)
+        relative_path,file_name = self.get_relative_path(url)  # Calculate relative path during analysis
 
         try:
             start_time = time.time()
@@ -287,14 +301,22 @@ class HTMLScraper:
 
             soup = BeautifulSoup(response.text, 'html.parser')
             title = self.extract_page_title(soup) or url
-
-            # Add node to graph data
+            labels = url.split('/')
+            label = next((label for label in reversed(labels) if label), 'undefined')
 
             node = {
                 'id': url_id,
                 'url': url,
-                'title': title
+                'title': title,
+                'filename': file_name,
+                'path': relative_path,
+                'label': label,
+                'size': page_size
             }
+
+            # Store file path mapping
+            self.file_paths[url] = relative_path
+
             if node not in self.graph_data['nodes']:
                 self.graph_data['nodes'].append(node)
 
@@ -339,9 +361,15 @@ class HTMLScraper:
                 del self.url_to_id[url]
             return set()
 
-    def analyze_site(self, max_workers=5):
-        """Analyze the site structure and create graph data."""
-        self.logger.info(f"Starting site analysis with {max_workers} workers")
+    def analyze_site(self, max_workers=5, max_pages=1000):
+        """
+        Analyze the site structure and create graph data.
+
+        Args:
+            max_workers (int): Maximum number of concurrent workers
+            max_pages (int): Maximum number of pages to analyze before stopping
+        """
+        self.logger.info(f"Starting site analysis with {max_workers} workers and {max_pages} page limit")
         self.status['analysis']['start_time'] = time.time()
         self.update_status('analyzing', 'Analyzing site structure...')
 
@@ -351,8 +379,17 @@ class HTMLScraper:
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 while urls_to_process:
-                    batch = list(urls_to_process)[:max_workers]
-                    urls_to_process = set(list(urls_to_process)[max_workers:])
+                    # Check if page limit has been reached
+                    if len(self.visited_urls) >= max_pages:
+                        self.logger.info(f"Reached maximum page limit of {max_pages}. Stopping analysis.")
+                        break
+
+                    # Calculate remaining pages we can process
+                    remaining_pages = max_pages - len(self.visited_urls)
+                    # Only take as many URLs as we can process within our limit
+                    batch_size = min(max_workers, remaining_pages, len(urls_to_process))
+                    batch = list(urls_to_process)[:batch_size]
+                    urls_to_process = set(list(urls_to_process)[batch_size:])
 
                     self.logger.info(f"Processing batch of {len(batch)} URLs")
                     self.logger.debug(f"Current batch: {batch}")
@@ -362,19 +399,20 @@ class HTMLScraper:
                     for future in futures:
                         try:
                             new_urls = future.result()
-                            if new_urls is not None:
+                            if new_urls is not None and len(self.visited_urls) < max_pages:
                                 new_unvisited_urls = {url for url in new_urls if url not in self.visited_urls}
                                 urls_to_process.update(new_unvisited_urls)
                                 self.logger.debug(f"Added {len(new_unvisited_urls)} new URLs to processing queue")
                         except Exception as e:
                             self.logger.error(f"Error processing batch: {str(e)}")
 
-                    self.logger.info(f"Analysis progress: {len(self.visited_urls)} pages found, {len(urls_to_process)} in queue")
+                    self.logger.info(f"Analysis progress: {len(self.visited_urls)}/{max_pages} pages found, {len(urls_to_process)} in queue")
                     self.update_status(
-                        message=f"Analysis progress: {len(self.visited_urls)} pages found",
+                        message=f"Analysis progress: {len(self.visited_urls)}/{max_pages} pages found",
                         analysis={
                             'pages_found': len(self.visited_urls),
-                            'urls_in_queue': len(urls_to_process)
+                            'urls_in_queue': len(urls_to_process),
+                            'pages_limit': max_pages
                         }
                     )
 
@@ -389,7 +427,7 @@ class HTMLScraper:
             self.status['analysis']['completion_time'] = time.time()
             analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
             self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
-            self.logger.info(f"Total pages found: {len(self.visited_urls)}")
+            self.logger.info(f"Total pages found: {len(self.visited_urls)} (max: {max_pages})")
 
             self.calculate_analysis_results(analysis_time)
             return self.visited_urls
@@ -479,28 +517,21 @@ class HTMLScraper:
     def download_page(self, url):
         """Download and save a single HTML page."""
         try:
-            # Update current batch information
             if url not in self.status['download']['current_batch']:
                 self.status['download']['current_batch'].append(url)
 
-            # Check if URL has already been downloaded
             if url in self.downloaded_urls:
                 self.status['download']['skipped_downloads'] += 1
-                # self.logger.info(f"Skipping already downloaded URL: {url}")
                 return True
 
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
 
-            relative_path = url.replace(self.domain, '').lstrip('/')
-            if not os.path.splitext(relative_path)[1]:
-                relative_path = os.path.join(relative_path, 'index.html')
-
+            relative_path, _ = self.get_relative_path(url)
             file_path = os.path.join(self.output_dir, relative_path)
 
             if os.path.exists(file_path):
                 self.status['download']['skipped_downloads'] += 1
-                # self.logger.info(f"File already exists: {file_path}")
                 self.downloaded_urls.add(url)
                 return True
 
@@ -519,16 +550,25 @@ class HTMLScraper:
             self.downloaded_files.append(file_info)
             self.downloaded_urls.add(url)
 
+            # Update the corresponding node in graph_data with download information
+            for node in self.graph_data['nodes']:
+                if node['url'] == url:
+                    node.update({
+                        'downloaded': True,
+                        'download_timestamp': file_info['timestamp'],
+                        'actual_size': file_info['size']
+                    })
+                    break
+
             # Update download progress
             self.status['download']['downloaded_pages'] += 1
             self.status['download']['successful_downloads'] += 1
 
-            # Update progress percentage
             total_pages = self.status['download']['total_pages']
             total_processed = (
-                    self.status['download']['successful_downloads'] +
-                    self.status['download']['failed_downloads'] +
-                    self.status['download']['skipped_downloads']
+                self.status['download']['successful_downloads'] +
+                self.status['download']['failed_downloads'] +
+                self.status['download']['skipped_downloads']
             )
             self.status['download']['progress_percentage'] = (
                 total_processed / total_pages * 100 if total_pages > 0 else 0
@@ -547,7 +587,6 @@ class HTMLScraper:
             self.logger.error(f"Error downloading {url}: {str(e)}")
             return False
         finally:
-            # Remove URL from current batch
             if url in self.status['download']['current_batch']:
                 self.status['download']['current_batch'].remove(url)
 

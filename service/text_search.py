@@ -144,8 +144,9 @@ class TextSearch:
                         'score': float(scores[idx]),
                         'document_id': doc['id'],
                         'position': idx,
-                        'filename': doc.get('filename', ''),  # Add filename to results
-                        'filepath': doc.get('filepath', '')
+                        'filename': doc.get('filename', ''),
+                        'filepath': doc.get('filepath', ''),
+                        'url': doc.get('url', '')
                     }
                     results.append(result)
 

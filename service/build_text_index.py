@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +48,19 @@ class BuildTextIndex:
             text_index=self
         )
 
+        graph_file = os.path.join(docs_dir, 'webpage_graph.json')
+        self.url_map = {}
+        if os.path.exists(graph_file):
+            with open(graph_file, 'r', encoding='utf-8') as f:
+                graph_data = json.load(f)
+                # Create a mapping from relative path to URL
+                for node in graph_data['nodes']:
+                    path = node.get('path', '')
+                    # Handle both path and relative_path keys
+                    if not path:
+                        path = node.get('relative_path', '')
+                    self.url_map[path] = node['url']
+
     def load_stopwords(self, file_path):
         with open(file_path, 'r') as f:
             self.stop_words = set(word.strip().lower() for word in f)
@@ -94,6 +108,16 @@ class BuildTextIndex:
             relative_path = os.path.relpath(filepath, self.docs_dir)
             filename = os.path.basename(filepath)
 
+            # Try to find URL from the path
+            url = None
+            if relative_path in self.url_map:
+                url = self.url_map[relative_path]
+            else:
+                # Try with normalized path (in case of Windows vs Unix paths)
+                normalized_path = relative_path.replace('\\', '/')
+                if normalized_path in self.url_map:
+                    url = self.url_map[normalized_path]
+
             if filepath.lower().endswith('.pdf'):
                 text_content = self.extract_text_from_pdf(filepath)
             elif filepath.lower().endswith('.html'):
@@ -108,12 +132,12 @@ class BuildTextIndex:
                     'content': text_content,
                     'filepath': relative_path,
                     'filename': filename,
+                    'url': url,
                     'type': 'pdf' if filepath.lower().endswith('.pdf') else 'html'
                 }
             return None
-
         except Exception as e:
-            self.logger.info(f"Error processing {filepath}: {str(e)}")
+            logger.error(f"Error processing file {filepath}: {str(e)}")
             return None
 
     def load_documents(self):
