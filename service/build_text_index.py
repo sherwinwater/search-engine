@@ -354,17 +354,17 @@ def main():
 
     # Check if saved index exists
     if os.path.exists(buildTextIndex.index_path):
-        self.logger.info("Found existing index file.")
+        print("Found existing index file.")
         try:
             buildTextIndex.load_index()
         except Exception as e:
-            self.logger.info(f"Error loading index: {e}")
-            self.logger.info("Building new index...")
+            print(f"Error loading index: {e}")
+            print("Building new index...")
             buildTextIndex.load_documents()
             buildTextIndex.build_index()
             buildTextIndex.save_index()
     else:
-        self.logger.info("No existing index found. Building new index...")
+        print("No existing index found. Building new index...")
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
         buildTextIndex.save_index()

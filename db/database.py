@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime
 from threading import local
+from urllib.parse import urlparse
 
 from utils.setup_logging import setup_logging
 
@@ -226,10 +227,11 @@ class SearchEngineDatabase:
         try:
             # Get a new connection for this thread if needed
             cursor = self.thread_safe_db.get_cursor()
-            base_path = os.path.dirname(url)
+            parsed_url = urlparse(url)
+            domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
             # Get task data
-            cursor.execute('SELECT * FROM tasks WHERE base_path = ?', (base_path,))
+            cursor.execute('SELECT * FROM tasks WHERE domain = ?', (domain,))
             task_data = cursor.fetchone()
 
             if task_data:
@@ -415,6 +417,78 @@ class SearchEngineDatabase:
             logger.error(f"Error retrieving building status: {e}")
             return []
 
+    def get_build_index_by_url(self, url: str):
+        """
+        Get text index building status by URL/domain.
+        First fetches scraping task data using the domain, then retrieves text index status.
+
+        Args:
+            url (str): The URL/domain to look up
+
+        Returns:
+            dict: Combined dictionary containing scraping task and text index data
+                  Returns None if no data found for the given URL
+        """
+        try:
+            # First get the scraping task data by URL
+            scraping_data = self.get_web_scraping_data_by_url(url)
+
+            if not scraping_data:
+                logger.info(f"No scraping task found for URL: {url}")
+                return None
+
+            # Get the task ID from scraping data
+            task_id = scraping_data['task_id']
+
+            # Get text index status using the task ID
+            index_status = self.get_building_text_index_status(task_id)
+
+            if not index_status:
+                logger.info(f"No text index found for task ID: {task_id}")
+                return {
+                    'task_id': task_id,
+                    'scraping_exists': True,
+                    'index_exists': False,
+                    'index_status': None
+                }
+
+            # Combine the data
+            return {
+                'task_id': task_id,
+                'scraping_exists': True,
+                'index_exists': True,
+                'status': index_status['status'],
+                'index_status': {
+                    'status': index_status['status'],
+                    'message': index_status['message'],
+                    'progress': {
+                        'total_files': index_status['total_files'],
+                        'processed_files': index_status['processed_files'],
+                        'failed_files': index_status['failed_files'],
+                        'progress_percentage': index_status['progress_percentage'],
+                        'current_file': index_status['current_file']
+                    },
+                    'timing': {
+                        'start_time': index_status['start_time'],
+                        'completion_time': index_status['completion_time'],
+                        'created_at': index_status['created_at'],
+                        'updated_at': index_status['updated_at']
+                    },
+                    'is_completed': index_status['is_completed'],
+                    'error': index_status['error'],
+                    'paths': {
+                        'docs_dir': index_status['docs_dir'],
+                        'index_path': index_status['index_path']
+                    }
+                }
+            }
+
+        except sqlite3.Error as e:
+            logger.error(f"Database error while getting build index by URL: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error while getting build index by URL: {e}")
+            return None
     def close(self):
         """Close all thread-local connections"""
         self.thread_safe_db.close()
