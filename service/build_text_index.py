@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 import PyPDF2
 
 from db.database import SearchEngineDatabase
+from utils.bm250kapi_weighted import BM25OkapiWeighted
 from utils.setup_logging import setup_logging
 
 
@@ -230,7 +231,6 @@ class BuildTextIndex:
                         self.documents.append(doc)
 
         self.logger.info(f"Loaded {len(self.documents)} documents")
-
     def build_index(self):
         """Build the search index from documents."""
         try:
@@ -297,7 +297,8 @@ class BuildTextIndex:
                 raise ValueError("Some documents contained no valid tokens after processing")
 
             doc_weights = [doc.get('rank_score', 1.0) for doc in documents]
-            self.bm25 = BM25Okapi(self.tokenized_docs, doc_weights)
+            # self.bm25 = BM25Okapi(corpus=self.tokenized_docs) // not weighted
+            self.bm25 = BM25OkapiWeighted(corpus=self.tokenized_docs, doc_weights=doc_weights)
 
             # Update completion status
             self.completion_time = datetime.now()
