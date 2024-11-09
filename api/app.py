@@ -36,7 +36,7 @@ CORS(app, resources={
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',
+    async_mode='eventlet',
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
@@ -543,6 +543,4 @@ if __name__ == '__main__':
         app,
         host=args.host,
         port=args.port,
-        debug=True,
-        allow_unsafe_werkzeug=True  # Only in development
-    )
+        debug=False)

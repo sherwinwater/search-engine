@@ -7,6 +7,7 @@ rank-bm25==0.2.2
 PyPDF2 ==3.0.1
 tqdm ==4.65.0
 validators==0.34.0
-flask-socketio==5.3.4
+flask-socketio==5.4.1
 
-eventlet==0.33.0
+eventlet==0.37.0
+gunicorn==23.0.0
