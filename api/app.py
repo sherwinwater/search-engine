@@ -21,7 +21,6 @@ from utils.json_serialize import prepare_scraper_status_for_json, prepare_index_
 from utils.setup_logging import setup_logging, SocketIOLogHandler
 
 app = Flask(__name__)
-
 # CORS(app, resources={r"/*": {"origins": "*"}})
 CORS(app, resources={
     r"/*": {  # Apply to all routes under /api/
@@ -36,7 +35,7 @@ CORS(app, resources={
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='eventlet',
+    async_mode='threading', #threading for development, useing eventlet for production
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
@@ -143,12 +142,12 @@ def scrape_web():
             "error": f"Invalid URL format: {url}"
         }), 400
 
-    # existing_task = db.get_web_scraping_data_by_url(url)
-    # if existing_task:
-    #     return jsonify({
-    #         "task_id": existing_task['task_id'],
-    #         "message": "URL was already scraped"
-    #     }), 200
+    existing_task = db.get_web_scraping_data_by_url(url)
+    if existing_task:
+        return jsonify({
+            "task_id": existing_task['task_id'],
+            "message": "URL was already scraped"
+        }), 200
 
     max_workers = int(request.args.get('max_workers', 10))
 
