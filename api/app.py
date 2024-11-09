@@ -143,12 +143,12 @@ def scrape_web():
             "error": f"Invalid URL format: {url}"
         }), 400
 
-    # existing_task = db.get_web_scraping_data_by_url(url)
-    # if existing_task:
-    #     return jsonify({
-    #         "task_id": existing_task['task_id'],
-    #         "message": "URL was already scraped"
-    #     }), 200
+    existing_task = db.get_web_scraping_data_by_url(url)
+    if existing_task:
+        return jsonify({
+            "task_id": existing_task['task_id'],
+            "message": "URL was already scraped"
+        }), 200
 
     max_workers = int(request.args.get('max_workers', 10))
 
