@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 import PyPDF2
 
 from db.database import SearchEngineDatabase
+from utils.bm250kapi_weighted import BM25OkapiWeighted
 from utils.setup_logging import setup_logging
 
 
@@ -48,19 +49,91 @@ class BuildTextIndex:
             text_index=self
         )
 
+        self.page_data = {}
+        self.load_webpage_graph(docs_dir)
+
+    def load_webpage_graph(self, docs_dir: str):
+        """Load webpage graph data with both URL mapping and rank information."""
         graph_file = os.path.join(docs_dir, 'webpage_graph.json')
-        self.url_map = {}
         if os.path.exists(graph_file):
             with open(graph_file, 'r', encoding='utf-8') as f:
                 graph_data = json.load(f)
-                # Create a mapping from relative path to URL
                 for node in graph_data['nodes']:
+                    # Create a complete data structure for each page
+                    page_info = {
+                        'url': node.get('url', ''),
+                        'final_rank': node.get('final_rank', 0.0),
+                        'initial_rank': node.get('initial_rank', 1.0),
+                        'weight': node.get('weight', 1.0),
+                        'metadata': node.get('metadata', {}),
+                        'title': node.get('title', '')
+                    }
+
+                    # Store by path
                     path = node.get('path', '')
-                    # Handle both path and relative_path keys
                     if not path:
                         path = node.get('relative_path', '')
-                    self.url_map[path] = node['url']
 
+                    if path:
+                        # Normalize path (handle Windows/Unix path differences)
+                        normalized_path = path.replace('\\', '/')
+                        self.page_data[normalized_path] = page_info
+
+                        # Also store with original path for compatibility
+                        self.page_data[path] = page_info
+
+    def get_page_info(self, filepath: str) -> Optional[Dict]:
+        """Get URL and rank information for a given filepath."""
+        relative_path = os.path.relpath(filepath, self.docs_dir)
+
+        # Try different path formats
+        paths_to_try = [
+            relative_path,
+            relative_path.replace('\\', '/'),  # Normalized path
+            os.path.basename(relative_path)  # Just filename
+        ]
+
+        for path in paths_to_try:
+            if path in self.page_data:
+                return self.page_data[path]
+
+        return None
+
+    def get_document_rank_score(self, doc: Dict) -> float:
+        """Calculate a combined rank score for a document."""
+        if not any(k in doc for k in ['final_rank', 'initial_rank', 'weight']):
+            return 1.0  # Default weight if no rank data found
+
+        # Calculate combined score using available metrics
+        final_rank = doc.get('final_rank', 0.0)
+        initial_rank = doc.get('initial_rank', 1.0)
+        weight = doc.get('weight', 1.0)
+
+        # Get content quality indicators from metadata
+        metadata = doc.get('metadata', {})
+        content_length = metadata.get('content_length', 0)
+        code_blocks = metadata.get('code_blocks', 0)
+        outbound_links = metadata.get('outbound_links', 0)
+
+        # Normalize content length (assuming average length of 5000)
+        normalized_length = min(content_length / 5000, 1.0) if content_length else 0.5
+
+        # Calculate content quality score
+        content_score = (
+                normalized_length * 0.4 +
+                min(code_blocks / 10, 1.0) * 0.3 +
+                min(outbound_links / 20, 1.0) * 0.3
+        )
+
+        # Combine different ranking factors
+        combined_score = (
+                final_rank * 0.4 +
+                initial_rank * 0.2 +
+                weight * 0.2 +
+                content_score * 0.2
+        )
+
+        return max(combined_score, 0.1)
     def load_stopwords(self, file_path):
         with open(file_path, 'r') as f:
             self.stop_words = set(word.strip().lower() for word in f)
@@ -108,15 +181,9 @@ class BuildTextIndex:
             relative_path = os.path.relpath(filepath, self.docs_dir)
             filename = os.path.basename(filepath)
 
-            # Try to find URL from the path
-            url = None
-            if relative_path in self.url_map:
-                url = self.url_map[relative_path]
-            else:
-                # Try with normalized path (in case of Windows vs Unix paths)
-                normalized_path = relative_path.replace('\\', '/')
-                if normalized_path in self.url_map:
-                    url = self.url_map[normalized_path]
+            # Get page information including URL and rank data
+            page_info = self.get_page_info(filepath)
+            url = page_info['url'] if page_info else None
 
             if filepath.lower().endswith('.pdf'):
                 text_content = self.extract_text_from_pdf(filepath)
@@ -128,16 +195,28 @@ class BuildTextIndex:
                 return None
 
             if text_content:
-                return {
+                doc = {
                     'content': text_content,
                     'filepath': relative_path,
                     'filename': filename,
                     'url': url,
                     'type': 'pdf' if filepath.lower().endswith('.pdf') else 'html'
                 }
+
+                # Add rank information if available
+                if page_info:
+                    doc.update({
+                        'final_rank': page_info['final_rank'],
+                        'initial_rank': page_info['initial_rank'],
+                        'weight': page_info['weight'],
+                        'metadata': page_info['metadata'],
+                        'title': page_info['title']
+                    })
+
+                return doc
             return None
         except Exception as e:
-            logger.error(f"Error processing file {filepath}: {str(e)}")
+            self.logger.error(f"Error processing file {filepath}: {str(e)}")
             return None
 
     def load_documents(self):
@@ -152,7 +231,6 @@ class BuildTextIndex:
                         self.documents.append(doc)
 
         self.logger.info(f"Loaded {len(self.documents)} documents")
-
     def build_index(self):
         """Build the search index from documents."""
         try:
@@ -191,8 +269,11 @@ class BuildTextIndex:
                 try:
                     doc = self.process_file(str(file_path))
                     if doc and doc['content'].strip():
+                        # Add rank score to document
+                        doc['rank_score'] = self.get_document_rank_score(doc)
                         documents.append(doc)
-                    self.logger.info(f"Processing file {file_path}...progress: {i}/{self.total_files} ({i / self.total_files * 100:.2f}%)")
+                    self.processed_files = i + 1
+                    self.progress_percentage = (i + 1) / self.total_files * 100
 
                 except Exception as e:
                     self.logger.error(f"Error processing file {file_path}: {e}")
@@ -215,7 +296,9 @@ class BuildTextIndex:
             if not all(self.tokenized_docs):
                 raise ValueError("Some documents contained no valid tokens after processing")
 
-            self.bm25 = BM25Okapi(self.tokenized_docs)
+            doc_weights = [doc.get('rank_score', 1.0) for doc in documents]
+            # self.bm25 = BM25Okapi(corpus=self.tokenized_docs) // not weighted
+            self.bm25 = BM25OkapiWeighted(corpus=self.tokenized_docs, doc_weights=doc_weights)
 
             # Update completion status
             self.completion_time = datetime.now()
@@ -354,17 +437,17 @@ def main():
 
     # Check if saved index exists
     if os.path.exists(buildTextIndex.index_path):
-        self.logger.info("Found existing index file.")
+        print("Found existing index file.")
         try:
             buildTextIndex.load_index()
         except Exception as e:
-            self.logger.info(f"Error loading index: {e}")
-            self.logger.info("Building new index...")
+            print(f"Error loading index: {e}")
+            print("Building new index...")
             buildTextIndex.load_documents()
             buildTextIndex.build_index()
             buildTextIndex.save_index()
     else:
-        self.logger.info("No existing index found. Building new index...")
+        print("No existing index found. Building new index...")
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
         buildTextIndex.save_index()

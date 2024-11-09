@@ -9,6 +9,8 @@ import os
 import validators
 from flask_socketio import SocketIO, join_room, leave_room
 from threading import Lock
+from urllib.parse import urlparse
+import time
 
 from db.database import SearchEngineDatabase
 from service.build_text_index import BuildTextIndex
@@ -20,7 +22,16 @@ from utils.setup_logging import setup_logging, SocketIOLogHandler
 
 app = Flask(__name__)
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+# CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={
+    r"/*": {  # Apply to all routes under /api/
+        "origins": "*",  # Allow all origins
+        "methods": ["GET", "POST", "OPTIONS"],  # Allowed methods
+        "allow_headers": ["Content-Type", "Authorization"],  # Allowed headers
+        "supports_credentials": True,  # Allow credentials
+        "expose_headers": ["Content-Range", "X-Content-Range"]  # Expose these headers to the frontend
+    }
+})
 
 socketio = SocketIO(
     app,
@@ -40,11 +51,13 @@ logger = setup_logging(__name__)
 
 active_connections = {}
 
+
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
     active_connections[sid] = set()  # Initialize empty set for room membership
     logger.info(f'Client connected: {sid}')
+
 
 @socketio.on('join')
 def handle_join(task_id):
@@ -57,6 +70,7 @@ def handle_join(task_id):
     except Exception as e:
         logger.error(f'Error joining room: {str(e)}')
 
+
 @socketio.on('disconnect')
 def handle_disconnect():
     sid = request.sid
@@ -67,6 +81,7 @@ def handle_disconnect():
             socketio.emit('status', {'message': f'Client left room {room}'}, room=room)
         del active_connections[sid]
     logger.info(f'Client disconnected: {sid}')
+
 
 def emit_log(task_id, message):
     """Utility function to emit logs to a specific task room"""
@@ -214,6 +229,8 @@ def build_text_index(task_id):
         }), 202
     finally:
         db.close()
+
+
 @app.route('/api/build_text_index/local', methods=['GET'])
 def build_text_index_with_local_data():
     """Get the status of a scraping task."""
@@ -261,6 +278,25 @@ def get_build_text_index_status(task_id):
             }), 404
 
         return jsonify(prepare_index_status_for_json(status))
+    finally:
+        db.close()
+
+
+@app.route('/api/text_index_status_by_url', methods=['POST'])
+def get_text_index_status_by_url():
+    """Get the status of a scraping task."""
+    data = request.get_json()
+    url = data.get('url')
+
+    if not url:
+        return jsonify({
+            "error": "'url' is required"
+        }), 400
+
+    db = SearchEngineDatabase()
+    try:
+        status = db.get_build_index_by_url(url)
+        return jsonify(status), 200
     finally:
         db.close()
 
@@ -316,6 +352,180 @@ def search_text(task_id):
 
     except Exception as e:
         logger.error(f"Search error for task {task_id}: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": "Internal server error",
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/build_index_by_url', methods=['POST'])
+def build_index_by_url():
+    """
+    Combined endpoint to scrape URL, build index, and search content.
+    Required parameters: url, query
+    """
+    try:
+        # Get URL and search query from request
+        data = request.get_json()
+        url = data.get('url')
+
+        if not url:
+            return jsonify({
+                "error": "'url' is required"
+            }), 400
+
+        # Validate URL format
+        if not validators.url(url):
+            return jsonify({
+                "error": f"Invalid URL format: {url}"
+            }), 400
+
+        # Extract domain from URL
+        domain = urlparse(url).netloc
+
+        # Initialize database connection
+        db = SearchEngineDatabase()
+        try:
+            # Check if domain has been scraped before
+            existing_tasks = db.get_web_scraping_data_by_url(url)
+            task_id = None
+
+            if existing_tasks:
+                # Use existing scrape data
+                task_id = existing_tasks['task_id']
+                logger.info(f"Using existing scrape data for domain {domain} with task_id: {task_id}")
+            else:
+                # Start new scraping task
+                task_id = str(uuid.uuid4())
+                destination_path = os.path.join('scraped_data', task_id)
+                os.makedirs(destination_path, exist_ok=True)
+
+                # Start scraping in background
+                thread = threading.Thread(
+                    target=background_scraping,
+                    args=(url, destination_path, task_id, 10)
+                )
+                thread.daemon = True
+                thread.start()
+
+                # Wait for scraping to complete
+                max_wait_time = 300  # 5 minutes timeout
+                start_time = time.time()
+
+                while True:
+                    scraper = db.get_web_scraping_status(task_id)
+                    if scraper:
+                        if scraper.get('status') == 'completed':
+                            break
+                        elif scraper.get('status') == 'failed':
+                            return jsonify({"error": "Scraping failed", "details": scraper.get('error')}), 500
+
+                    if time.time() - start_time > max_wait_time:
+                        return jsonify({"error": "Scraping timeout"}), 504
+
+                    time.sleep(2)
+
+            # Start index building if needed
+            index_status = db.get_building_text_index_status(task_id)
+            if not index_status or index_status.get('status') != 'completed':
+                # Get scraper status to get docs_dir
+                scraper = db.get_web_scraping_status(task_id)
+                docs_dir = scraper.get('output_dir')
+
+                # Start building index
+                thread = threading.Thread(
+                    target=background_building_index,
+                    args=(docs_dir, task_id)
+                )
+                thread.daemon = True
+                thread.start()
+
+            else:
+                logger.info(f"Using existing index for domain {domain} with task_id: {task_id}")
+                return jsonify({
+                    "task_id": task_id,
+                    "url": url,
+                    "status": 'completed',
+                })
+
+            return jsonify({
+                "task_id": task_id,
+                "url": url,
+                "status": 'processing',
+            })
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error in search_url endpoint: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": "Internal server error",
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/search_url', methods=['POST'])
+def search_url():
+    """
+    Combined endpoint to scrape URL, build index, and search content.
+    Required parameters in request body: url, query
+    """
+    try:
+        # Get data from request body
+        data = request.get_json()
+        url = data.get('url')
+        search_query = data.get('query')
+
+        if not url or not search_query:
+            return jsonify({
+                'error': 'Missing required parameters: url and query must be provided'
+            }), 400
+
+        # Validate URL format
+        if not validators.url(url):
+            return jsonify({
+                "error": f"Invalid URL format: {url}"
+            }), 400
+
+        domain = urlparse(url).netloc
+
+        db = SearchEngineDatabase()
+        try:
+            existing_tasks = db.get_web_scraping_data_by_url(url)
+
+            if not existing_tasks:
+                return jsonify({
+                    "error": f"Domain {domain} has not been scraped yet"
+                }), 404
+
+            task_id = existing_tasks['task_id']
+
+            index_status = db.get_building_text_index_status(task_id)
+            if not index_status or index_status.get('status') != 'completed':
+                return jsonify({
+                    "error": f"Index for domain {domain} has not been built yet"
+                }), 404
+
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            index_path = os.path.join(parent_dir, 'index_data', f"{task_id}.pkl")
+            searcher = TextSearch(index_path=index_path)
+            results = searcher.search(search_query, top_k=5)
+
+            return jsonify({
+                "task_id": task_id,
+                "url": url,
+                "query": search_query,
+                "results": convert_numpy_types(results)
+            }), 200
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error in search_url endpoint: {str(e)}")
         return jsonify({
             "status": "error",
             "message": "Internal server error",

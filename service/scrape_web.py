@@ -216,7 +216,7 @@ class HTMLScraper:
 
     def is_valid_url(self, url):
         """Check if URL should be processed."""
-        if not url or not url.startswith(self.base_path):
+        if not url or not url.startswith(self.domain):
             return False
 
         # Define excluded URL patterns
@@ -247,22 +247,43 @@ class HTMLScraper:
 
     def normalize_url(self, url, current_url):
         """Normalize URL to absolute form."""
-        url = url.split('#')[0]
+        # Remove fragments and whitespace
+        url = url.split('#')[0].strip()
+
+        # Skip empty URLs
+        if not url:
+            return None
+
+        # Skip invalid URL types
+        if url.startswith(('mailto:', 'tel:', 'javascript:', 'data:')):
+            return None
+
+        # Handle absolute URLs
         if url.startswith(('http://', 'https://')):
             return url
+
+        # Handle root-relative URLs
         if url.startswith('/'):
             return urljoin(self.domain, url)
+
+        # Handle relative URLs
         return urljoin(current_url, url)
 
     def extract_links(self, soup, current_url):
         """Extract all valid HTML links from content."""
         links = set()
-        for tag in soup.find_all('a', href=True):
-            url = tag.get('href')
+        for tag in soup.find_all(['a'], href=True):
+            url = tag.get('href', '').strip()
             if url:
-                absolute_url = self.normalize_url(url, current_url)
-                if self.is_valid_url(absolute_url) and absolute_url not in self.visited_urls:
-                    links.add(absolute_url)
+                try:
+                    absolute_url = self.normalize_url(url, current_url)
+                    if self.is_valid_url(absolute_url) and absolute_url not in self.visited_urls:
+                        links.add(absolute_url)
+                        self.logger.debug(f"Found valid link: {absolute_url}")
+                except Exception as e:
+                    self.logger.debug(f"Error processing link {url}: {str(e)}")
+
+        self.logger.info(f"Found {len(links)} valid links on page {current_url}")
         return links
 
     def analyze_page(self, url):
@@ -275,7 +296,7 @@ class HTMLScraper:
 
         self.visited_urls.add(url)
         url_id = self.get_url_id(url)
-        relative_path,file_name = self.get_relative_path(url)  # Calculate relative path during analysis
+        relative_path, file_name = self.get_relative_path(url)  # Calculate relative path during analysis
 
         try:
             start_time = time.time()
@@ -304,6 +325,18 @@ class HTMLScraper:
             labels = url.split('/')
             label = next((label for label in reversed(labels) if label), 'undefined')
 
+            # Calculate page weight and metadata
+            page_weight = self.calculate_content_weight(soup, url)
+            node_metadata = {
+                'content_length': len(soup.get_text()),
+                'headers_count': len(soup.find_all(['h1', 'h2', 'h3'])),
+                'code_blocks': len(soup.find_all(['code', 'pre'])),
+                'outbound_links': 0,
+                'http_status': response.status_code,
+                'content_type': content_type,
+                'last_updated': time.time()
+            }
+
             node = {
                 'id': url_id,
                 'url': url,
@@ -311,7 +344,11 @@ class HTMLScraper:
                 'filename': file_name,
                 'path': relative_path,
                 'label': label,
-                'size': page_size
+                'size': page_size,
+                'weight': page_weight,
+                'initial_rank': 1.0,
+                'final_rank': None,
+                'metadata': node_metadata
             }
 
             # Store file path mapping
@@ -330,20 +367,34 @@ class HTMLScraper:
             )
 
             links = self.extract_links(soup, response.url)
-
-            # Add edges to graph data
+            # Add edges to graph data with weights
             for link in links:
                 if link not in self.url_to_id:
                     link_id = self.get_url_id(link)
                 else:
                     link_id = self.url_to_id[link]
 
+                # Find the link element to calculate weight
+                link_element = soup.find('a', href=lambda x: x and (link in x or link.endswith(x.lstrip('/'))))
+                if link_element:
+                    link_weight = self.calculate_link_weight(url, link, link_element)
+                else:
+                    link_weight = 1.0  # Default weight if link element not found
+
                 edge = {
                     'source': url_id,
-                    'target': link_id
+                    'target': link_id,
+                    'weight': link_weight,
+                    'metadata': {
+                        'link_text': link_element.get_text().strip() if link_element else '',
+                        'link_class': link_element.get('class', []) if link_element else [],
+                        'link_position': link_element.parent.name if link_element and link_element.parent else None
+                    }
                 }
+
                 if edge not in self.graph_data['links']:
                     self.graph_data['links'].append(edge)
+                    node_metadata['outbound_links'] += 1  # Update outbound links count
 
             self.logger.info(f"Found {len(links)} new links on page {url}")
             return links
@@ -361,7 +412,7 @@ class HTMLScraper:
                 del self.url_to_id[url]
             return set()
 
-    def analyze_site(self, max_workers=5, max_pages=1000):
+    def analyze_site(self, max_workers=5, max_pages=100):
         """
         Analyze the site structure and create graph data.
 
@@ -462,8 +513,9 @@ class HTMLScraper:
     def get_graph_data(self):
         """Return the current graph data."""
         return self.graph_data
+
     def calculate_analysis_results(self, analysis_time):
-        """Calculate and store analysis results."""
+        """Calculate and store analysis results with proper error handling."""
         self.logger.info("Starting analysis results calculation")
         total_pages = len(self.visited_urls)
 
@@ -472,48 +524,63 @@ class HTMLScraper:
             self.update_status('failed', 'No HTML pages found to analyze!')
             return
 
-        # Calculate basic metrics
-        avg_page_size = mean(self.page_sizes)
-        total_size_kb = sum(self.page_sizes)
-        avg_request_time = mean(self.request_times)
-        estimated_total_time = avg_request_time * total_pages
+        try:
+            # Calculate basic metrics with safety checks
+            avg_page_size = mean(self.page_sizes) if self.page_sizes else 0
+            total_size_kb = sum(self.page_sizes) if self.page_sizes else 0
+            avg_request_time = mean(self.request_times) if self.request_times else 0
+            estimated_total_time = avg_request_time * total_pages if avg_request_time > 0 else 0
 
-        # Log basic metrics
-        self.logger.info(f"Analysis Metrics:")
-        self.logger.info(f"- Total Pages: {total_pages}")
-        self.logger.info(f"- Average Page Size: {round(avg_page_size, 2)} KB")
-        self.logger.info(f"- Total Size: {round(total_size_kb, 2)} KB ({round(total_size_kb / 1024, 2)} MB)")
-        self.logger.info(f"- Average Request Time: {round(avg_request_time, 2)} seconds")
-        self.logger.info(f"- Analysis Time: {round(analysis_time, 2)} seconds")
+            # Log basic metrics
+            self.logger.info(f"Analysis Metrics:")
+            self.logger.info(f"- Total Pages: {total_pages}")
+            self.logger.info(f"- Average Page Size: {round(avg_page_size, 2)} KB")
+            self.logger.info(f"- Total Size: {round(total_size_kb, 2)} KB ({round(total_size_kb / 1024, 2)} MB)")
+            self.logger.info(f"- Average Request Time: {round(avg_request_time, 2)} seconds")
+            self.logger.info(f"- Analysis Time: {round(analysis_time, 2)} seconds")
 
-        # Log estimated completion times
-        self.logger.info("Estimated Completion Times:")
-        self.logger.info(f"- Sequential: {round(estimated_total_time / 60, 2)} minutes")
-        self.logger.info(f"- With 5 workers: {round(estimated_total_time / 5 / 60, 2)} minutes")
-        self.logger.info(f"- With 10 workers: {round(estimated_total_time / 10 / 60, 2)} minutes")
+            # Check if we have any successful downloads before calculating estimates
+            if avg_request_time > 0:
+                self.logger.info("Estimated Completion Times:")
+                self.logger.info(f"- Sequential: {round(estimated_total_time / 60, 2)} minutes")
+                self.logger.info(f"- With 5 workers: {round(estimated_total_time / 5 / 60, 2)} minutes")
+                self.logger.info(f"- With 10 workers: {round(estimated_total_time / 10 / 60, 2)} minutes")
+            else:
+                self.logger.warning("No successful requests to estimate completion times")
 
-        # Log URL statistics
-        self.logger.debug(f"Discovered URLs: {sorted(list(self.visited_urls))}")
+            # Log URL statistics
+            self.logger.debug(f"Discovered URLs: {sorted(list(self.visited_urls))}")
 
-        self.update_status(
-            status='analysis_completed',
-            message='Analysis completed',
-            analysis={
-                'total_pages': total_pages,
-                'average_page_size_kb': round(avg_page_size, 2),
-                'total_size_kb': round(total_size_kb, 2),
-                'total_size_mb': round(total_size_kb / 1024, 2),
-                'average_request_time': round(avg_request_time, 2),
-                'analysis_time_seconds': round(analysis_time, 2),
-                'estimated_times': {
-                    'sequential_minutes': round(estimated_total_time / 60, 2),
-                    'parallel_5_workers_minutes': round(estimated_total_time / 5 / 60, 2),
-                    'parallel_10_workers_minutes': round(estimated_total_time / 10 / 60, 2)
-                },
-                'discovered_urls': sorted(list(self.visited_urls))
-            }
-        )
-        self.logger.info("Analysis results calculation completed")
+            self.update_status(
+                status='analysis_completed',
+                message='Analysis completed',
+                analysis={
+                    'total_pages': total_pages,
+                    'average_page_size_kb': round(avg_page_size, 2),
+                    'total_size_kb': round(total_size_kb, 2),
+                    'total_size_mb': round(total_size_kb / 1024, 2),
+                    'average_request_time': round(avg_request_time, 2),
+                    'analysis_time_seconds': round(analysis_time, 2),
+                    'estimated_times': {
+                        'sequential_minutes': round(estimated_total_time / 60, 2),
+                        'parallel_5_workers_minutes': round(estimated_total_time / 5 / 60, 2),
+                        'parallel_10_workers_minutes': round(estimated_total_time / 10 / 60, 2)
+                    } if avg_request_time > 0 else None,
+                    'discovered_urls': sorted(list(self.visited_urls))
+                }
+            )
+            self.logger.info("Analysis results calculation completed")
+
+        except Exception as e:
+            self.logger.error(f"Error calculating analysis results: {str(e)}")
+            self.update_status(
+                status='analysis_error',
+                message=f'Error calculating analysis results: {str(e)}',
+                analysis={
+                    'total_pages': total_pages,
+                    'error': str(e)
+                }
+            )
     def download_page(self, url):
         """Download and save a single HTML page."""
         try:
@@ -667,6 +734,7 @@ class HTMLScraper:
     def save_graph_data(self):
         """Save the graph data to a JSON file."""
         self.graph_data = self.deduplicate_graph_data()
+        self.calculate_pagerank()
 
         try:
             # Create the graph data structure
@@ -800,6 +868,196 @@ class HTMLScraper:
             'title': next((node['title'] for node in self.graph_data['nodes'] if node['id'] == page_id), None),
             'outgoing_links': count
         } for page_id, count in top_pages]
+
+    def calculate_content_weight(self, soup, url: str) -> float:
+        """Calculate weight based on content quality and relevance."""
+        weight = 1.0  # Base weight
+
+        # 1. Title relevance
+        title = soup.title.string if soup.title else ""
+        if title:
+            # Higher weight for pages with meaningful titles
+            weight *= 1.2
+            # Extra weight for main/index pages
+            if any(keyword in title.lower() for keyword in ['home', 'index', 'main', 'documentation']):
+                weight *= 1.5
+
+        # 2. Content length and structure
+        content_length = len(soup.get_text())
+        if content_length > 5000:  # Long, detailed pages
+            weight *= 1.3
+        elif content_length < 500:  # Very short pages
+            weight *= 0.7
+
+        # 3. Header structure
+        headers = soup.find_all(['h1', 'h2', 'h3'])
+        if headers:
+            weight *= (1 + min(len(headers) * 0.1, 0.5))  # Up to 50% boost for well-structured content
+
+        # 4. URL structure
+        if url.endswith(('index.html', '/', 'main.html')):
+            weight *= 1.4  # Higher weight for index pages
+        depth = len([x for x in url.split('/') if x]) - 2  # -2 for domain
+        weight *= max(0.5, 1 - (depth * 0.1))  # Reduce weight for deeply nested pages
+
+        # 5. Code examples and technical content
+        code_blocks = len(soup.find_all(['code', 'pre']))
+        if code_blocks > 0:
+            weight *= (1 + min(code_blocks * 0.05, 0.3))  # Up to 30% boost for technical content
+
+        return round(weight, 3)
+
+    def calculate_link_weight(self, source_url: str, target_url: str, link_element) -> float:
+        """Calculate weight for links between pages."""
+        weight = 1.0
+
+        # 1. Link position and visibility
+        if link_element.parent and link_element.parent.name in ['nav', 'header', 'footer']:
+            weight *= 1.3  # Navigation links are important
+
+        # 2. Link text relevance
+        link_text = link_element.get_text().lower()
+        if any(keyword in link_text for keyword in ['documentation', 'guide', 'tutorial', 'reference']):
+            weight *= 1.4
+
+        # 3. Link attributes
+        if link_element.get('class'):
+            classes = ' '.join(link_element.get('class')).lower()
+            if any(term in classes for term in ['nav', 'menu', 'primary']):
+                weight *= 1.2
+
+        # 4. Relative path depth difference
+        source_depth = len(source_url.split('/'))
+        target_depth = len(target_url.split('/'))
+        depth_diff = abs(target_depth - source_depth)
+        weight *= max(0.7, 1 - (depth_diff * 0.1))  # Reduce weight for big depth differences
+
+        return round(weight, 3)
+
+    def analyze_page(self, url):
+        """Enhanced analyze_page method with weight calculations."""
+        if url in self.visited_urls:
+            return set()
+
+        self.visited_urls.add(url)
+        url_id = self.get_url_id(url)
+        relative_path, file_name = self.get_relative_path(url)
+
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+            title = self.extract_page_title(soup) or url
+
+            # Calculate page weight
+            page_weight = self.calculate_content_weight(soup, url)
+
+            # Enhanced node data with weights
+            node = {
+                'id': url_id,
+                'url': url,
+                'title': title,
+                'filename': file_name,
+                'path': relative_path,
+                'label': os.path.basename(url.rstrip('/')),
+                'size': len(response.content) / 1024,
+                'weight': page_weight,  # Add page weight
+                'initial_rank': 1.0,  # Initial PageRank score
+                'final_rank': None,  # Will be calculated later
+                'metadata': {
+                    'content_length': len(soup.get_text()),
+                    'headers_count': len(soup.find_all(['h1', 'h2', 'h3'])),
+                    'code_blocks': len(soup.find_all(['code', 'pre'])),
+                    'outbound_links': 0  # Will be updated
+                }
+            }
+
+            if node not in self.graph_data['nodes']:
+                self.graph_data['nodes'].append(node)
+
+            # Process links with weights
+            links = set()
+            for link_element in soup.find_all('a', href=True):
+                target_url = self.normalize_url(link_element['href'], url)
+
+                if self.is_valid_url(target_url):
+                    links.add(target_url)
+                    target_id = self.get_url_id(target_url)
+
+                    # Calculate link weight
+                    link_weight = self.calculate_link_weight(url, target_url, link_element)
+
+                    # Enhanced edge data with weights
+                    edge = {
+                        'source': url_id,
+                        'target': target_id,
+                        'weight': link_weight,
+                        'metadata': {
+                            'link_text': link_element.get_text().strip(),
+                            'link_class': link_element.get('class', []),
+                            'link_position': link_element.parent.name if link_element.parent else None
+                        }
+                    }
+
+                    if edge not in self.graph_data['links']:
+                        self.graph_data['links'].append(edge)
+
+                    # Update outbound links count
+                    for node in self.graph_data['nodes']:
+                        if node['id'] == url_id:
+                            node['metadata']['outbound_links'] += 1
+                            break
+
+            return links
+
+        except Exception as e:
+            self.logger.error(f"Error analyzing {url}: {str(e)}")
+            self.visited_urls.remove(url)
+            if url in self.url_to_id:
+                del self.url_to_id[url]
+            return set()
+
+    def calculate_pagerank(self, damping_factor=0.85, max_iterations=100, tolerance=1e-6):
+        """Calculate PageRank scores for all nodes."""
+        try:
+            n = len(self.graph_data['nodes'])
+            if n == 0:
+                return
+
+            # Initialize scores
+            scores = {node['id']: 1 / n for node in self.graph_data['nodes']}
+
+            for _ in range(max_iterations):
+                prev_scores = scores.copy()
+
+                for node in self.graph_data['nodes']:
+                    # Get incoming edges
+                    incoming = [link for link in self.graph_data['links'] if link['target'] == node['id']]
+
+                    # Calculate new score
+                    rank = (1 - damping_factor) / n
+
+                    for edge in incoming:
+                        source_outlinks = sum(1 for link in self.graph_data['links'] if link['source'] == edge['source'])
+                        if source_outlinks > 0:
+                            rank += damping_factor * prev_scores[edge['source']] * edge['weight'] / source_outlinks
+
+                    scores[node['id']] = rank
+
+                # Check convergence
+                diff = sum(abs(scores[node_id] - prev_scores[node_id]) for node_id in scores)
+                if diff < tolerance:
+                    break
+
+            # Update nodes with final PageRank scores
+            for node in self.graph_data['nodes']:
+                node['final_rank'] = scores[node['id']]
+
+            self.logger.info("PageRank calculation completed successfully")
+
+        except Exception as e:
+            self.logger.error(f"Error calculating PageRank: {str(e)}")
 
 if __name__ == "__main__":
     base_url = "https://courses.grainger.illinois.edu/cs425/fa2024/assignments.html"
