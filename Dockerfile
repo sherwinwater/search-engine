@@ -24,9 +24,5 @@ COPY . .
 # Expose port
 EXPOSE 5009
 
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
-
 # Start Gunicorn with eventlet worker
 CMD ["gunicorn", "--worker-class", "eventlet", "--workers", "1", "--bind", "0.0.0.0:5009", "--timeout", "120", "--keep-alive", "5", "--log-level", "info", "api.app:app"]
