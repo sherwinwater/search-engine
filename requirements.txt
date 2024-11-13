@@ -11,3 +11,13 @@ flask-socketio==5.4.1
 
 eventlet==0.37.0
 gunicorn==23.0.0
+
+## text clustering
+pandas==2.2.3
+scikit-learn==1.5.2
+python-docx==1.1.2
+nltk==3.9.1
+gensim==4.3.3
+
+## text summarization
+networkx==3.4.2

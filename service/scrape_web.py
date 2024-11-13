@@ -88,16 +88,41 @@ class HTMLScraper:
         self.url_to_id[url] = new_id
         return new_id
 
-    def get_relative_path(self, url):
-        """Generate relative path for a URL and extract base filename."""
+    def get_absolute_path(self, url):
+        """Generate absolute path for a URL and extract base filename.
+
+        Args:
+            url (str): The URL to convert to a path
+
+        Returns:
+            tuple: (absolute_path, base_filename)
+
+        Example:
+            For URL: 'https://example.com/docs/guide'
+            With output_dir: '/home/user/website/content'
+            Returns: ('/home/user/website/content/docs/guide/index.html', 'index.html')
+        """
+        # First get the path relative to domain
         relative_path = url.replace(self.domain, '').lstrip('/')
+
+        # Add index.html if no extension
         if not os.path.splitext(relative_path)[1]:
             relative_path = os.path.join(relative_path, 'index.html')
             base_filename = 'index.html'
         else:
-            base_filename = os.path.basename(relative_path)  # This will get just 'edges.html' from the path
+            base_filename = os.path.basename(relative_path)
 
-        return relative_path, base_filename
+        # Convert to absolute path using output_dir as base
+        absolute_path = os.path.abspath(os.path.join(self.output_dir, relative_path))
+
+        # Ensure the absolute path is within output_dir for security
+        if not absolute_path.startswith(os.path.abspath(self.output_dir)):
+            raise ValueError(f"Path {absolute_path} is outside docs directory {self.output_dir}")
+
+        # Normalize path separators for cross-platform compatibility
+        absolute_path = absolute_path.replace('\\', '/')
+
+        return absolute_path, base_filename
 
     def extract_page_title(self, soup):
         """Extract page title from BeautifulSoup object."""
@@ -296,7 +321,7 @@ class HTMLScraper:
 
         self.visited_urls.add(url)
         url_id = self.get_url_id(url)
-        relative_path, file_name = self.get_relative_path(url)  # Calculate relative path during analysis
+        absolute_path, file_name = self.get_absolute_path(url)  # Calculate relative path during analysis
 
         try:
             start_time = time.time()
@@ -342,7 +367,7 @@ class HTMLScraper:
                 'url': url,
                 'title': title,
                 'filename': file_name,
-                'path': relative_path,
+                'path': absolute_path,
                 'label': label,
                 'size': page_size,
                 'weight': page_weight,
@@ -352,7 +377,7 @@ class HTMLScraper:
             }
 
             # Store file path mapping
-            self.file_paths[url] = relative_path
+            self.file_paths[url] = absolute_path
 
             if node not in self.graph_data['nodes']:
                 self.graph_data['nodes'].append(node)
@@ -594,8 +619,8 @@ class HTMLScraper:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
 
-            relative_path, _ = self.get_relative_path(url)
-            file_path = os.path.join(self.output_dir, relative_path)
+            absolute_path, _ = self.get_absolute_path(url)
+            file_path = os.path.join(self.output_dir, absolute_path)
 
             if os.path.exists(file_path):
                 self.status['download']['skipped_downloads'] += 1
@@ -609,7 +634,7 @@ class HTMLScraper:
 
             file_info = {
                 'url': url,
-                'filename': relative_path,
+                'filename': absolute_path,
                 'size': len(response.text),
                 'timestamp': time.time()
             }
@@ -941,7 +966,7 @@ class HTMLScraper:
 
         self.visited_urls.add(url)
         url_id = self.get_url_id(url)
-        relative_path, file_name = self.get_relative_path(url)
+        absolute_path, file_name = self.get_absolute_path(url)
 
         try:
             response = self.session.get(url, timeout=10)
@@ -959,7 +984,7 @@ class HTMLScraper:
                 'url': url,
                 'title': title,
                 'filename': file_name,
-                'path': relative_path,
+                'path': absolute_path,
                 'label': os.path.basename(url.rstrip('/')),
                 'size': len(response.content) / 1024,
                 'weight': page_weight,  # Add page weight
@@ -1060,10 +1085,10 @@ class HTMLScraper:
             self.logger.error(f"Error calculating PageRank: {str(e)}")
 
 if __name__ == "__main__":
-    base_url = "https://courses.grainger.illinois.edu/cs425/fa2024/assignments.html"
+    # base_url = "https://courses.grainger.illinois.edu/cs425/fa2024/assignments.html"
     # base_url = "https://storm.apache.org/releases/2.7.0/index.html"
     # base_url = "https://visjs.github.io/vis-network/docs/network/index.html"
-    # base_url = "https://d3js.org/d3-force"
+    base_url = "https://d3js.org/d3-force"
     output_dir = "../test/scraped_data"
 
     logger = setup_logging(name=f"{__name__}", task_id="test")

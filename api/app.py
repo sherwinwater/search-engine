@@ -542,4 +542,6 @@ if __name__ == '__main__':
         app,
         host=args.host,
         port=args.port,
-        debug=False)
+        debug=False,
+        allow_unsafe_werkzeug=True
+    )
