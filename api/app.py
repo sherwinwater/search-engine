@@ -14,6 +14,7 @@ import time
 
 from db.database import SearchEngineDatabase
 from service.build_text_index import BuildTextIndex
+from service.document_clustering import DocumentClustering
 from service.scrape_web import HTMLScraper
 from service.text_search import TextSearch
 from utils.convert_numpy_types import convert_numpy_types
@@ -112,10 +113,10 @@ def background_scraping(url, output_dir, task_id, max_workers=10):
         db.close()
 
 
-def background_building_index(docs_dir: str, task_id: str):
+def background_building_index(docs_dir: str, task_id: str,url:str):
     """Background task for site analysis and downloading."""
     try:
-        buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id)
+        buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id,scraping_url=url)
 
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
@@ -124,6 +125,33 @@ def background_building_index(docs_dir: str, task_id: str):
     except Exception as e:
         logger.exception(e)
 
+
+def background_clustering(docs_dir, task_id, url):
+    """Background task for building clusters"""
+    try:
+        db = SearchEngineDatabase()
+        try:
+            # Update status to processing
+            db.update_clustering_status(task_id, 'processing')
+
+            # Set up paths
+            webpage_graph = os.path.join(docs_dir, 'webpage_graph.json')
+
+            # Initialize and run clustering
+            cluster = DocumentClustering(task_id,docs_dir, webpage_graph)
+            cluster.build_clustering_data()
+
+            # Update status to completed
+            db.update_clustering_status(task_id, 'completed')
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error in clustering for task {task_id}: {error_msg}")
+            db.update_clustering_status(task_id, 'failed', error=error_msg)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Critical error in clustering thread: {str(e)}")
 
 @app.route('/api/scrape_web', methods=['GET'])
 def scrape_web():
@@ -212,11 +240,12 @@ def build_text_index(task_id):
             }), 404
 
         docs_dir = scraper.get('output_dir')
+        url = scraper.get('base_path')
 
         # Start background thread
         thread = threading.Thread(
             target=background_building_index,
-            args=(docs_dir, task_id)
+            args=(docs_dir, task_id,url)
         )
         thread.daemon = True
         thread.start()
@@ -226,6 +255,16 @@ def build_text_index(task_id):
             "message": "Building text index",
             "status_endpoint": f"/build_text_index_status/{task_id}"
         }), 202
+    finally:
+        db.close()
+@app.route('/api/text_indexes', methods=['GET'])
+def get_all_building_text_index():
+    """Get the status of a scraping task."""
+    db = SearchEngineDatabase()
+
+    try:
+        text_indexes = db.get_all_building_text_index()
+        return jsonify(text_indexes), 200
     finally:
         db.close()
 
@@ -276,7 +315,52 @@ def get_build_text_index_status(task_id):
                 "error": "Task not found"
             }), 404
 
-        return jsonify(prepare_index_status_for_json(status))
+        return jsonify(status)
+    finally:
+        db.close()
+
+
+@app.route('/api/text_index/<task_id>', methods=['GET'])
+def get_build_text_index_by_task_id(task_id):
+    db = SearchEngineDatabase()
+    try:
+        text_index = db.get_building_text_index_status(task_id)
+        if not text_index:
+            return jsonify({
+                "error": "Task not found"
+            }), 404
+
+        parent_dir = text_index.get('docs_dir')
+
+        # Add webpage graph data
+        webpage_graph_file = os.path.join(parent_dir, 'webpage_graph.json')
+        if os.path.exists(webpage_graph_file):
+            with open(webpage_graph_file, 'r') as f:
+                text_index['webpage_graph'] = json.load(f)
+
+        # Add clustering data
+        clustering_status = db.get_clustering_status(task_id)
+        if clustering_status:
+            text_index['clustering_status'] = clustering_status
+
+            # If clustering is completed, add the cluster structure
+            if clustering_status.get('status') == 'completed':
+                cluster_structure_file = os.path.join(parent_dir, 'clustering_data', 'cluster_structure.json')
+                if os.path.exists(cluster_structure_file):
+                    try:
+                        with open(cluster_structure_file, 'r') as f:
+                            text_index['clustering_data'] = json.load(f)
+                    except Exception as e:
+                        logger.error(f"Error reading cluster structure: {e}")
+                        text_index['clustering_data'] = None
+
+        return jsonify(text_index)
+    except Exception as e:
+        logger.error(f"Error in get_build_text_index_by_task_id: {e}")
+        return jsonify({
+            "error": "Internal server error",
+            "message": str(e)
+        }), 500
     finally:
         db.close()
 
@@ -361,11 +445,11 @@ def search_text(task_id):
 @app.route('/api/build_index_by_url', methods=['POST'])
 def build_index_by_url():
     """
-    Combined endpoint to scrape URL, build index, and search content.
-    Required parameters: url, query
+    Combined endpoint to scrape URL, build index, and cluster content.
+    Required parameters: url
     """
     try:
-        # Get URL and search query from request
+        # Get URL from request
         data = request.get_json()
         url = data.get('url')
 
@@ -398,12 +482,15 @@ def build_index_by_url():
                 # Start new scraping task
                 task_id = str(uuid.uuid4())
                 destination_path = os.path.join('scraped_data', task_id)
-                os.makedirs(destination_path, exist_ok=True)
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                abs_destination_path = os.path.abspath(os.path.join(current_dir, destination_path))
+
+                os.makedirs(abs_destination_path, exist_ok=True)
 
                 # Start scraping in background
                 thread = threading.Thread(
                     target=background_scraping,
-                    args=(url, destination_path, task_id, 10)
+                    args=(url, abs_destination_path, task_id, 10)
                 )
                 thread.daemon = True
                 thread.start()
@@ -425,40 +512,70 @@ def build_index_by_url():
 
                     time.sleep(2)
 
-            # Start index building if needed
+            # Get scraper status to get docs_dir
+            scraper = db.get_web_scraping_status(task_id)
+            docs_dir = scraper.get('output_dir')
+
+            # Check and start index building if needed
             index_status = db.get_building_text_index_status(task_id)
             if not index_status or index_status.get('status') != 'completed':
-                # Get scraper status to get docs_dir
-                scraper = db.get_web_scraping_status(task_id)
-                docs_dir = scraper.get('output_dir')
-
                 # Start building index
                 thread = threading.Thread(
                     target=background_building_index,
-                    args=(docs_dir, task_id)
+                    args=(docs_dir, task_id, url)
                 )
                 thread.daemon = True
                 thread.start()
 
+                # Wait for indexing to complete
+                max_wait_time = 300  # 5 minutes timeout
+                start_time = time.time()
+
+                while True:
+                    index_status = db.get_building_text_index_status(task_id)
+                    if index_status:
+                        if index_status.get('status') == 'completed':
+                            break
+                        elif index_status.get('status') == 'failed':
+                            return jsonify({"error": "Indexing failed", "details": index_status.get('error')}), 500
+
+                    if time.time() - start_time > max_wait_time:
+                        return jsonify({"error": "Indexing timeout"}), 504
+
+                    time.sleep(2)
+
+            # Check and start clustering if needed
+            clustering_status = db.get_clustering_status(task_id)
+            if not clustering_status or clustering_status.get('status') != 'completed':
+                # Start clustering in background
+                thread = threading.Thread(
+                    target=background_clustering,
+                    args=(docs_dir, task_id, url)
+                )
+                thread.daemon = True
+                thread.start()
+
+            # Return response based on overall status
+            clustering_status = db.get_clustering_status(task_id)
+            if clustering_status and clustering_status.get('status') == 'completed':
+                status = 'completed'
             else:
-                logger.info(f"Using existing index for domain {domain} with task_id: {task_id}")
-                return jsonify({
-                    "task_id": task_id,
-                    "url": url,
-                    "status": 'completed',
-                })
+                status = 'processing'
 
             return jsonify({
                 "task_id": task_id,
                 "url": url,
-                "status": 'processing',
+                "status": status,
+                "scraping_status": scraper.get('status'),
+                "indexing_status": index_status.get('status') if index_status else 'not_started',
+                "clustering_status": clustering_status.get('status') if clustering_status else 'not_started'
             })
 
         finally:
             db.close()
 
     except Exception as e:
-        logger.error(f"Error in search_url endpoint: {str(e)}")
+        logger.error(f"Error in build_index_by_url endpoint: {str(e)}")
         return jsonify({
             "status": "error",
             "message": "Internal server error",

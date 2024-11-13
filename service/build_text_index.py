@@ -17,7 +17,7 @@ from utils.setup_logging import setup_logging
 
 
 class BuildTextIndex:
-    def __init__(self, docs_dir: str, task_id: str):
+    def __init__(self, docs_dir: str, task_id: str, scraping_url:str=''):
         # Convert docs_dir to absolute path if it's not already
         self.docs_dir = os.path.abspath(docs_dir)
         self.documents: List[Dict] = []
@@ -46,6 +46,7 @@ class BuildTextIndex:
         self.processed_files = 0
         self.current_file = ''
         self.progress_percentage = 0
+        self.scraping_url = scraping_url
 
         self.db = SearchEngineDatabase()
         self.db.update_text_index(
