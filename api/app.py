@@ -1,5 +1,6 @@
 import argparse
 import json
+import shutil
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -18,8 +19,7 @@ from service.document_clustering import DocumentClustering
 from service.scrape_web import HTMLScraper
 from service.text_search import TextSearch
 from utils.convert_numpy_types import convert_numpy_types
-from utils.delete_files_except import delete_files_except
-from utils.json_serialize import prepare_scraper_status_for_json, prepare_index_status_for_json
+from utils.json_serialize import prepare_scraper_status_for_json
 from utils.setup_logging import setup_logging, SocketIOLogHandler
 
 app = Flask(__name__)
@@ -98,6 +98,43 @@ def home():
     }
     return jsonify(data)
 
+def delete_files_except(base_path, exceptions,task_id):
+    """
+    Delete all files and folders in the given path except those specified in exceptions.
+
+    Args:
+        base_path (str): Path to the directory where deletion will occur
+        exceptions (list): List of file/folder names to preserve
+    """
+    # Ensure the path exists
+    logger = setup_logging(name=f"{__name__}", task_id=task_id)
+
+
+    if not os.path.exists(base_path):
+        logger.info(f"Path {base_path} does not exist")
+        return
+
+    # List all items in the directory
+    items = os.listdir(base_path)
+
+    # Delete each item unless it's in exceptions
+    for item in items:
+        item_path = os.path.join(base_path, item)
+
+        # Skip if item is in exceptions
+        if item in exceptions:
+            logger.info(f"Preserving: {item}")
+            continue
+
+        try:
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+                logger.info(f"Deleted file: {item}")
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+                logger.info(f"Deleted directory: {item}")
+        except Exception as e:
+            logger.exception(f"Error deleting {item}: {str(e)}")
 
 def background_scraping(url, output_dir, task_id, max_workers=10):
     """Background task for site analysis and downloading."""
