@@ -1,0 +1,760 @@
+{
+  "Conic_Shape": {
+    "documents": [
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/index.html",
+        "url": "https://d3js.org/",
+        "file_type": ".html",
+        "index": 0,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k D3The JavaScript library for bespoke data visualizationCreate custom dynamic visualizations with unparalleled flexibilityGet startedWhat is D3?Examp..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-contour/index.html",
+        "url": "https://d3js.org/d3-contour",
+        "file_type": ".html",
+        "index": 2,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-contour Fork This module computes contour polygons by applying marching squares to a rectangular grid of numeric values. For example,..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/index.html",
+        "url": "https://d3js.org/d3-shape",
+        "file_type": ".html",
+        "index": 3,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-shape Visualizations can be represented by discrete graphical marks such as symbols, arcs, lines, and areas. While the rectangles of ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/index.html",
+        "url": "https://d3js.org/d3-geo",
+        "file_type": ".html",
+        "index": 11,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-geo Map projections are sometimes implemented as point transformations a function that takes a given longitude lambda and latitude ph..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/index.html",
+        "url": "https://d3js.org/d3-hierarchy",
+        "file_type": ".html",
+        "index": 20,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-hierarchy Many datasets are intrinsically hierarchical geographic entities, such as census blocks, census tracts, counties and states..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/index.html",
+        "url": "https://d3js.org/d3-force",
+        "file_type": ".html",
+        "index": 25,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-force Fork This module implements a velocity Verlet numerical integrator for simulating physical forces on particles. Force simulatio..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-chord/index.html",
+        "url": "https://d3js.org/d3-chord",
+        "file_type": ".html",
+        "index": 26,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-chord 29,630 black0k5k10k15k20k25k20,230 blond0k5k10k15k20k40,290 brown0k5k10k15k20k25k30k35k40k9,850 red0k5k11,975 black  black5,871..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/what-is-d3/index.html",
+        "url": "https://d3js.org/what-is-d3",
+        "file_type": ".html",
+        "index": 30,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageWhat is D3? D3 or D3.js is a free, open-source JavaScript library for visualizing data. Its low-level approach built on web standards of..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/azimuthal/index.html",
+        "url": "https://d3js.org/d3-geo/azimuthal",
+        "file_type": ".html",
+        "index": 68,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageAzimuthal projections Azimuthal projections project the sphere directly onto a plane.geoAzimuthalEqualArea Source  The azimuthal equal-a..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/conic/index.html",
+        "url": "https://d3js.org/d3-geo/conic",
+        "file_type": ".html",
+        "index": 69,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageConic projections Conic projections project the sphere onto a cone, and then unroll the cone onto the plane. Conic projections have two ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/cylindrical/index.html",
+        "url": "https://d3js.org/d3-geo/cylindrical",
+        "file_type": ".html",
+        "index": 70,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCylindrical projections Cylindrical projections project the sphere onto a containing cylinder, and then unroll the cylinder onto the pla..."
+      }
+    ],
+    "keywords": [
+      "conic",
+      "shape",
+      "chord",
+      "data",
+      "visualizations"
+    ],
+    "size": 11,
+    "cluster_id": 4
+  },
+  "Bin_Stack": {
+    "documents": [
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-format/index.html",
+        "url": "https://d3js.org/d3-format",
+        "file_type": ".html",
+        "index": 1,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-format Ever noticed how sometimes JavaScript doesnt display numbers the way you expect? Like, you tried to print tenths with a simple..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/index.html",
+        "url": "https://d3js.org/d3-array",
+        "file_type": ".html",
+        "index": 4,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-array Array manipulation, ordering, searching, summarizing, etc.See one ofAdding numbers - Add floating point values with full precis..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-polygon/index.html",
+        "url": "https://d3js.org/d3-polygon",
+        "file_type": ".html",
+        "index": 5,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-polygon This module provides a few basic geometric operations for two-dimensional polygons. Each polygon is represented as an array o..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-axis/index.html",
+        "url": "https://d3js.org/d3-axis",
+        "file_type": ".html",
+        "index": 8,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-axis The axis component renders human-readable reference marks for position scales. It works with most scale types, including linear,..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-time-format/index.html",
+        "url": "https://d3js.org/d3-time-format",
+        "file_type": ".html",
+        "index": 13,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-time-format This module provides an approximate JavaScript implementation of the venerable strptime and strftime functions from the C..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-random/index.html",
+        "url": "https://d3js.org/d3-random",
+        "file_type": ".html",
+        "index": 16,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-random Generate random numbers from various distributions. For seeded random number generation, see random.source and randomLcg.rando..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-time/index.html",
+        "url": "https://d3js.org/d3-time",
+        "file_type": ".html",
+        "index": 17,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-time When visualizing time series data, analyzing temporal patterns, or working with time in general, the irregularities of conventio..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/getting-started/index.html",
+        "url": "https://d3js.org/getting-started",
+        "file_type": ".html",
+        "index": 22,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageGetting started D3 works in any JavaScript environment.Try D3 online The fastest way to get started and get help with D3 is on Observabl..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-dsv/index.html",
+        "url": "https://d3js.org/d3-dsv",
+        "file_type": ".html",
+        "index": 28,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-dsv This module provides a parser and formatter for delimiter-separated values, most commonly comma-separated values CSV or tab-separ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/stack/index.html",
+        "url": "https://d3js.org/d3-shape/stack",
+        "file_type": ".html",
+        "index": 40,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageStacks Examples  Stacking converts lengths into contiguous position intervals. For example, a bar chart of monthly sales might be broken..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/ticks/index.html",
+        "url": "https://d3js.org/d3-array/ticks",
+        "file_type": ".html",
+        "index": 41,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageTicks Generate representative values from a continuous interval.ticksstart, stop, count Examples  Source  Returns an array of approximat..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/sort/index.html",
+        "url": "https://d3js.org/d3-array/sort",
+        "file_type": ".html",
+        "index": 42,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSorting data Sort values see also bisect.ascendinga, b Examples  Source  Returns -1 if a is less than b, 1 if a is greater than b, 0 if ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/bin/index.html",
+        "url": "https://d3js.org/d3-array/bin",
+        "file_type": ".html",
+        "index": 43,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageBinning data Bin quantitative values into consecutive, non-overlapping intervals, as in histograms. See also Observable Plots bin transf..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/bisect/index.html",
+        "url": "https://d3js.org/d3-array/bisect",
+        "file_type": ".html",
+        "index": 44,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageBisecting data Bisection, or binary search, quickly finds a given value in a sorted array. It is often used to find the position at whic..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/summarize/index.html",
+        "url": "https://d3js.org/d3-array/summarize",
+        "file_type": ".html",
+        "index": 45,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSummarizing data Compute summary statistics.countiterable, accessor jsd3.countpenguins, d  d.body_mass_g  342Examples  Source  Returns t..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/add/index.html",
+        "url": "https://d3js.org/d3-array/add",
+        "file_type": ".html",
+        "index": 46,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageAdding numbers Add floating point numbers with full precision.new Adder jsconst adder  new d3.AdderExamples  Source  Creates a new adder..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/sets/index.html",
+        "url": "https://d3js.org/d3-array/sets",
+        "file_type": ".html",
+        "index": 47,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSet operations Logical set operations for any iterable.differenceiterable, ...others Source  Returns a new InternSet containing every va..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-array/intern/index.html",
+        "url": "https://d3js.org/d3-array/intern",
+        "file_type": ".html",
+        "index": 48,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageInterning values The InternMap and InternSet classes extend the native JavaScript Map and Set classes, respectively, allowing Dates and ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/time/index.html",
+        "url": "https://d3js.org/d3-scale/time",
+        "file_type": ".html",
+        "index": 58,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageTime scales Time scales are a variant of linear scales that have a temporal domain domain values are coerced to dates rather than number..."
+      }
+    ],
+    "keywords": [
+      "bin",
+      "stack",
+      "array",
+      "ticks",
+      "axis"
+    ],
+    "size": 19,
+    "cluster_id": 2
+  },
+  "Sequential_Linear": {
+    "documents": [
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/index.html",
+        "url": "https://d3js.org/d3-scale",
+        "file_type": ".html",
+        "index": 6,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-scale Scales map a dimension of abstract data to a visual representation. Although most often used for encoding data as position, say..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale-chromatic/index.html",
+        "url": "https://d3js.org/d3-scale-chromatic",
+        "file_type": ".html",
+        "index": 7,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-scale-chromatic This module provides sequential, diverging and categorical color schemes designed to work with d3-scales d3.scaleOrdi..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-color/index.html",
+        "url": "https://d3js.org/d3-color",
+        "file_type": ".html",
+        "index": 9,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-color Even though your browser understands a lot about colors, it doesnt offer much help in manipulating colors through JavaScript. T..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-interpolate/index.html",
+        "url": "https://d3js.org/d3-interpolate",
+        "file_type": ".html",
+        "index": 14,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-interpolate This module provides a variety of interpolation methods for blending between two values. Values may be numbers, colors, s..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-ease/index.html",
+        "url": "https://d3js.org/d3-ease",
+        "file_type": ".html",
+        "index": 29,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-ease Examples  Easing is a method of distorting time to control apparent motion in animation. It is most commonly used for slow-in, s..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/quantize/index.html",
+        "url": "https://d3js.org/d3-scale/quantize",
+        "file_type": ".html",
+        "index": 49,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageQuantize scales Quantize scales are similar to linear scales, except they use a discrete rather than continuous range. The continuous in..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/pow/index.html",
+        "url": "https://d3js.org/d3-scale/pow",
+        "file_type": ".html",
+        "index": 50,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePower scales Power pow scales are similar to linear scales, except an exponential transform is applied to the input domain value before ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/ordinal/index.html",
+        "url": "https://d3js.org/d3-scale/ordinal",
+        "file_type": ".html",
+        "index": 51,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageOrdinal scales Unlike continuous scales, ordinal scales have a discrete domain and range. For example, an ordinal scale might map a set ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/quantile/index.html",
+        "url": "https://d3js.org/d3-scale/quantile",
+        "file_type": ".html",
+        "index": 52,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageQuantile scales Quantile scales map a sampled input domain to a discrete range. The domain is considered continuous and thus the scale w..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/point/index.html",
+        "url": "https://d3js.org/d3-scale/point",
+        "file_type": ".html",
+        "index": 53,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePoint scales Point scales are a variant of band scales with the bandwidth fixed to zero. Point scales are typically used for scatterplot..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/band/index.html",
+        "url": "https://d3js.org/d3-scale/band",
+        "file_type": ".html",
+        "index": 54,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageBand scales Band scales are like ordinal scales except the output range is continuous and numeric. The scale divides the continuous rang..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/linear/index.html",
+        "url": "https://d3js.org/d3-scale/linear",
+        "file_type": ".html",
+        "index": 55,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageLinear scales Linear scales map a continuous, quantitative input domain to a continuous output range using a linear transformation trans..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/diverging/index.html",
+        "url": "https://d3js.org/d3-scale/diverging",
+        "file_type": ".html",
+        "index": 56,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageDiverging scales Diverging scales are similar to linear scales in that they map a continuous, numeric input domain to a continuous outpu..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/sequential/index.html",
+        "url": "https://d3js.org/d3-scale/sequential",
+        "file_type": ".html",
+        "index": 57,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSequential scales Sequential scales are similar to linear scales in that they map a continuous, numeric input domain to a continuous out..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/threshold/index.html",
+        "url": "https://d3js.org/d3-scale/threshold",
+        "file_type": ".html",
+        "index": 59,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageThreshold scales Threshold scales are similar to quantize scales, except they allow you to map arbitrary subsets of the domain to discre..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/log/index.html",
+        "url": "https://d3js.org/d3-scale/log",
+        "file_type": ".html",
+        "index": 60,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageLogarithmic scales Logarithmic log scales are like linear scales except that a logarithmic transform is applied to the input domain valu..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale/symlog/index.html",
+        "url": "https://d3js.org/d3-scale/symlog",
+        "file_type": ".html",
+        "index": 61,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSymlog scales See A bi-symmetric log transformation for wide-range data by Webber for details. Unlike a log scale, a symlog scale domain..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale-chromatic/diverging/index.html",
+        "url": "https://d3js.org/d3-scale-chromatic/diverging",
+        "file_type": ".html",
+        "index": 62,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageDiverging schemes Diverging color schemes are available as continuous interpolators often used with d3.scaleSequential and as discrete s..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale-chromatic/sequential/index.html",
+        "url": "https://d3js.org/d3-scale-chromatic/sequential",
+        "file_type": ".html",
+        "index": 63,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSequential schemes Sequential color schemes are available as continuous interpolators often used with d3.scaleSequential and as discrete..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale-chromatic/cyclical/index.html",
+        "url": "https://d3js.org/d3-scale-chromatic/cyclical",
+        "file_type": ".html",
+        "index": 64,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCyclical schemes To create a cyclical continuous color scale using the Rainbow color schemejsconst color  d3.scaleSequentiald3.interpola..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-scale-chromatic/categorical/index.html",
+        "url": "https://d3js.org/d3-scale-chromatic/categorical",
+        "file_type": ".html",
+        "index": 65,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCategorical schemes For example, to create a categorical color scale using the Accent color schemejsconst color  d3.scaleOrdinald3.schem..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-interpolate/color/index.html",
+        "url": "https://d3js.org/d3-interpolate/color",
+        "file_type": ".html",
+        "index": 71,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageColor interpolation Interpolators for colors in various color spaces.interpolateRgba, b jsd3.interpolateRgbpurple, orangeExamples  Sourc..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-interpolate/value/index.html",
+        "url": "https://d3js.org/d3-interpolate/value",
+        "file_type": ".html",
+        "index": 72,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageValue interpolation These are the most general interpolators, suitable for most values.interpolatea, b Examples  Source  Returns an inte..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-interpolate/zoom/index.html",
+        "url": "https://d3js.org/d3-interpolate/zoom",
+        "file_type": ".html",
+        "index": 73,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageZoom interpolation An interpolator for zooming smoothly between two views of a two-dimensional plane based on Smooth and efficient zoomi..."
+      }
+    ],
+    "keywords": [
+      "sequential",
+      "linear",
+      "value",
+      "band",
+      "scale"
+    ],
+    "size": 24,
+    "cluster_id": 1
+  },
+  "Selection_Drag": {
+    "documents": [
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-dispatch/index.html",
+        "url": "https://d3js.org/d3-dispatch",
+        "file_type": ".html",
+        "index": 10,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-dispatch Dispatching is a low-level interaction mechanism that allows you to register named callbacks and then call them with arbitra..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-timer/index.html",
+        "url": "https://d3js.org/d3-timer",
+        "file_type": ".html",
+        "index": 12,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-timer This module provides an efficient queue capable of managing thousands of concurrent animations, while guaranteeing consistent, ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-zoom/index.html",
+        "url": "https://d3js.org/d3-zoom",
+        "file_type": ".html",
+        "index": 15,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-zoom Examples  Panning and zooming let the user focus on a region of interest by restricting the view. It uses direct manipulation cl..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/index.html",
+        "url": "https://d3js.org/d3-selection",
+        "file_type": ".html",
+        "index": 18,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-selection Selections allow powerful data-driven transformation of the document object model DOM set attributes, styles, properties, H..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-drag/index.html",
+        "url": "https://d3js.org/d3-drag",
+        "file_type": ".html",
+        "index": 19,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-drag Examples  Drag-and-drop is a popular interaction method for manipulating spatial elements move the pointer to an object, press a..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-fetch/index.html",
+        "url": "https://d3js.org/d3-fetch",
+        "file_type": ".html",
+        "index": 21,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-fetch This module provides convenient parsing on top of Fetch. For example, to load a text filejsconst text  await d3.texthello-world..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-transition/index.html",
+        "url": "https://d3js.org/d3-transition",
+        "file_type": ".html",
+        "index": 24,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-transition A transition is a selection-like interface for animating changes to the DOM. Instead of applying changes instantaneously, ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-brush/index.html",
+        "url": "https://d3js.org/d3-brush",
+        "file_type": ".html",
+        "index": 27,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-brush Brushing is the interactive specification a one- or two-dimensional selected region using a pointing gesture, such as by clicki..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/selecting/index.html",
+        "url": "https://d3js.org/d3-selection/selecting",
+        "file_type": ".html",
+        "index": 74,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSelecting elements A selection is a set of elements from the DOM. Typically these elements are identified by selectors such as .fancy fo..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/modifying/index.html",
+        "url": "https://d3js.org/d3-selection/modifying",
+        "file_type": ".html",
+        "index": 75,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageModifying elements After selecting elements, use the selection to modify the elements. For example, to set the class and color style of ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/namespaces/index.html",
+        "url": "https://d3js.org/d3-selection/namespaces",
+        "file_type": ".html",
+        "index": 76,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageNamespaces XML namespaces are fun! Right?  Fortunately you can mostly ignore them.A case where you need to specify them is when appendin..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/joining/index.html",
+        "url": "https://d3js.org/d3-selection/joining",
+        "file_type": ".html",
+        "index": 77,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageJoining data For an introduction, see Thinking With Joins and the selection.join notebook.selection.datadata, key Source  Binds the spec..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/locals/index.html",
+        "url": "https://d3js.org/d3-selection/locals",
+        "file_type": ".html",
+        "index": 78,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageLocal variables D3 locals allow you to define local state independent of data. For instance, when rendering small multiples of time-seri..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/control-flow/index.html",
+        "url": "https://d3js.org/d3-selection/control-flow",
+        "file_type": ".html",
+        "index": 79,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageControl flow For advanced usage, selections provide methods for custom control flow.selection.eachfunction Source  Invokes the specified..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-selection/events/index.html",
+        "url": "https://d3js.org/d3-selection/events",
+        "file_type": ".html",
+        "index": 80,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageHandling events For interaction, selections allow listening for and dispatching of events.selection.ontypenames, listener, options Sourc..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/hierarchy/index.html",
+        "url": "https://d3js.org/d3-hierarchy/hierarchy",
+        "file_type": ".html",
+        "index": 85,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageHierarchies Before you can compute a hierarchical layout, you need a root node. If your data is already in a hierarchical format, such a..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/stratify/index.html",
+        "url": "https://d3js.org/d3-hierarchy/stratify",
+        "file_type": ".html",
+        "index": 87,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageStratify Examples  Consider the following table of relationshipsNameParentEveCainEveSethEveEnosSethNoamSethAbelEveAwanEveEnochAwanAzuraE..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-transition/modifying/index.html",
+        "url": "https://d3js.org/d3-transition/modifying",
+        "file_type": ".html",
+        "index": 90,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageModifying elements After selecting elements and creating a transition with selection.transition, use the transitions transformation meth..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-transition/timing/index.html",
+        "url": "https://d3js.org/d3-transition/timing",
+        "file_type": ".html",
+        "index": 91,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageTiming The easing, delay and duration of a transition is configurable. For example, a per-element delay can be used to stagger the reord..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/simulation/index.html",
+        "url": "https://d3js.org/d3-force/simulation",
+        "file_type": ".html",
+        "index": 96,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageForce simulations A force simulation implements a velocity Verlet numerical integrator for simulating physical forces on particles nodes..."
+      }
+    ],
+    "keywords": [
+      "selection",
+      "drag",
+      "brush",
+      "events",
+      "index"
+    ],
+    "size": 20,
+    "cluster_id": 3
+  },
+  "Ribbon_Link": {
+    "documents": [
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-path/index.html",
+        "url": "https://d3js.org/d3-path",
+        "file_type": ".html",
+        "index": 23,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this paged3-path Examples  Say you have some code that draws to a 2D canvasjsfunction drawCirclecontext, radius  context.moveToradius, 0 context...."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-contour/contour/index.html",
+        "url": "https://d3js.org/d3-contour/contour",
+        "file_type": ".html",
+        "index": 31,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageContour polygons For each threshold value, the contour generator constructs a GeoJSON MultiPolygon geometry object representing the area..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/area/index.html",
+        "url": "https://d3js.org/d3-shape/area",
+        "file_type": ".html",
+        "index": 32,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageAreas Examples  The area generator produces an area defined by a topline and a baseline as in an area chart. Typically, the two lines sh..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/radial-link/index.html",
+        "url": "https://d3js.org/d3-shape/radial-link",
+        "file_type": ".html",
+        "index": 33,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageRadial links A radial link generator is like the Cartesian link generator except the x and y accessors are replaced with angle and radiu..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/radial-line/index.html",
+        "url": "https://d3js.org/d3-shape/radial-line",
+        "file_type": ".html",
+        "index": 34,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageRadial lines Examples  A radial line generator is like the Cartesian line generator except the x and y accessors are replaced with angle..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/symbol/index.html",
+        "url": "https://d3js.org/d3-shape/symbol",
+        "file_type": ".html",
+        "index": 35,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSymbols Examples  Symbols provide a categorical shape encoding as in a scatterplot. Symbols are centered at the origin use a transform t..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/pie/index.html",
+        "url": "https://d3js.org/d3-shape/pie",
+        "file_type": ".html",
+        "index": 36,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePies Examples  The pie generator computes the necessary angles to represent a tabular dataset as a pie or donut chart these angles can t..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/link/index.html",
+        "url": "https://d3js.org/d3-shape/link",
+        "file_type": ".html",
+        "index": 37,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageLinks Examples  The link shape generates a smooth cubic Bézier curve from a source point to a target point. The tangents of the curve at..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/line/index.html",
+        "url": "https://d3js.org/d3-shape/line",
+        "file_type": ".html",
+        "index": 38,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageLines Examples  The line generator produces a spline or polyline as in a line chart. Lines also appear in many other visualization types..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-shape/radial-area/index.html",
+        "url": "https://d3js.org/d3-shape/radial-area",
+        "file_type": ".html",
+        "index": 39,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageRadial areas Examples  A radial area generator is like the Cartesian area generator except the x and y accessors are replaced with angle..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/shape/index.html",
+        "url": "https://d3js.org/d3-geo/shape",
+        "file_type": ".html",
+        "index": 66,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageSpherical shapes These shape generators return spherical GeoJSON for use with geoPath.TIPTo generate a great arc a segment of a great ci..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-geo/path/index.html",
+        "url": "https://d3js.org/d3-geo/path",
+        "file_type": ".html",
+        "index": 67,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePaths The geographic path generator, geoPath, takes a given GeoJSON geometry or feature object and generates SVG path data string or ren..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-delaunay/delaunay/index.html",
+        "url": "https://d3js.org/d3-delaunay/delaunay",
+        "file_type": ".html",
+        "index": 81,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageDelaunay triangulations The Delaunay triangulation is a triangular mesh formed from a set of points in x and y. No point is inside the c..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-delaunay/voronoi/index.html",
+        "url": "https://d3js.org/d3-delaunay/voronoi",
+        "file_type": ".html",
+        "index": 82,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageVoronoi diagrams Given a set of points, the Voronoi diagram partitions the plane into cells representing the region of the plane that is..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/tree/index.html",
+        "url": "https://d3js.org/d3-hierarchy/tree",
+        "file_type": ".html",
+        "index": 83,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageTree ChaosChaosErosChaosErebusChaosTartarusChaosGaiaChaosGaiaMountainsChaosGaiaPontusChaosGaiaUranusErosChaosErosErebusChaosErebusTartar..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/cluster/index.html",
+        "url": "https://d3js.org/d3-hierarchy/cluster",
+        "file_type": ".html",
+        "index": 84,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCluster ChaosChaosErosChaosErebusChaosTartarusChaosGaiaChaosGaiaMountainsChaosGaiaPontusChaosGaiaUranusErosChaosErosErebusChaosErebusTar..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/pack/index.html",
+        "url": "https://d3js.org/d3-hierarchy/pack",
+        "file_type": ".html",
+        "index": 86,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePack Examples  Enclosure diagrams use containment nesting to represent a hierarchy. The size of the leaf circles encodes a quantitative ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/partition/index.html",
+        "url": "https://d3js.org/d3-hierarchy/partition",
+        "file_type": ".html",
+        "index": 88,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePartition Examples  The partition layout produces adjacency diagrams a space-filling variant of a node-link tree diagram. Rather than dr..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-hierarchy/treemap/index.html",
+        "url": "https://d3js.org/d3-hierarchy/treemap",
+        "file_type": ".html",
+        "index": 89,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageTreemap Examples  Introduced by Ben Shneiderman in 1991, a treemap recursively subdivides area into rectangles according to each nodes a..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/many-body/index.html",
+        "url": "https://d3js.org/d3-force/many-body",
+        "file_type": ".html",
+        "index": 92,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageMany-body force The many-body or n-body force applies mutually amongst all nodes. It can be used to simulate gravity attraction if the s..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/position/index.html",
+        "url": "https://d3js.org/d3-force/position",
+        "file_type": ".html",
+        "index": 93,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pagePosition forces The x- and y-position forces push nodes towards a desired position along the given dimension with a configurable strengt..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/center/index.html",
+        "url": "https://d3js.org/d3-force/center",
+        "file_type": ".html",
+        "index": 94,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCenter force The center force translates nodes uniformly so that the mean position of all nodes the center of mass if all nodes have equ..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-force/collide/index.html",
+        "url": "https://d3js.org/d3-force/collide",
+        "file_type": ".html",
+        "index": 95,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageCollide force Fork The collide force treats nodes as circles with a given radius, rather than points, and prevents nodes from overlappin..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-chord/ribbon/index.html",
+        "url": "https://d3js.org/d3-chord/ribbon",
+        "file_type": ".html",
+        "index": 97,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageRibbons A ribbon visually represents the volume of flow between two nodes in a chord diagram. Ribbons come in two varieties ribbon repre..."
+      },
+      {
+        "file_path": "/Users/shuwenwang/Documents/dev/uiuc/search-engine/scraped_data/19f45318-d8b2-4b25-8a55-69d5ff3c09f9/d3-chord/chord/index.html",
+        "url": "https://d3js.org/d3-chord/chord",
+        "file_type": ".html",
+        "index": 98,
+        "preview": "SearchK7.9.0GitHub 108.7k SearchK7.9.0GitHub 108.7k On this pageChords The chord layout computes angles to generate a chord diagram.chord Source  Constructs a new chord layout with the default setting..."
+      }
+    ],
+    "keywords": [
+      "ribbon",
+      "link",
+      "radial",
+      "area",
+      "voronoi"
+    ],
+    "size": 25,
+    "cluster_id": 0
+  }
+}

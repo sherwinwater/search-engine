@@ -18,6 +18,7 @@ from service.document_clustering import DocumentClustering
 from service.scrape_web import HTMLScraper
 from service.text_search import TextSearch
 from utils.convert_numpy_types import convert_numpy_types
+from utils.delete_files_except import delete_files_except
 from utils.json_serialize import prepare_scraper_status_for_json, prepare_index_status_for_json
 from utils.setup_logging import setup_logging, SocketIOLogHandler
 
@@ -144,10 +145,13 @@ def background_clustering(docs_dir, task_id, url):
             # Update status to completed
             db.update_clustering_status(task_id, 'completed')
 
+            exceptions = ['webpage_graph.json', 'clustering_data']
+            delete_files_except(docs_dir, exceptions,task_id)
+
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Error in clustering for task {task_id}: {error_msg}")
-            db.update_clustering_status(task_id, 'failed', error=error_msg)
+            db.update_clustering_status(task_id, 'failed', error_msg)
         finally:
             db.close()
     except Exception as e:
@@ -481,9 +485,9 @@ def build_index_by_url():
             else:
                 # Start new scraping task
                 task_id = str(uuid.uuid4())
-                destination_path = os.path.join('scraped_data', task_id)
                 current_dir = os.path.dirname(os.path.abspath(__file__))
-                abs_destination_path = os.path.abspath(os.path.join(current_dir, destination_path))
+                root_dir = os.path.dirname(current_dir)
+                abs_destination_path = os.path.join(root_dir, 'scraped_data', task_id)
 
                 os.makedirs(abs_destination_path, exist_ok=True)
 

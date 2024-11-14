@@ -525,7 +525,7 @@ class DocumentClustering:
 
             self.logger.info(f"Processed {end_idx} documents")
 
-        self.logger.info("self.task_idFinished creating browsable structure")
+        self.logger.info("Finished creating browsable structure")
         return dict(structure)
 
     def save_results(self):
