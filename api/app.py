@@ -37,7 +37,7 @@ CORS(app, resources={
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='eventlet', #threading for development, useing eventlet for production
+    async_mode='threading',  # threading for development, useing eventlet for production
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
@@ -98,7 +98,8 @@ def home():
     }
     return jsonify(data)
 
-def delete_files_except(base_path, exceptions,task_id):
+
+def delete_files_except(base_path, exceptions, task_id):
     """
     Delete all files and folders in the given path except those specified in exceptions.
 
@@ -108,7 +109,6 @@ def delete_files_except(base_path, exceptions,task_id):
     """
     # Ensure the path exists
     logger = setup_logging(name=f"{__name__}", task_id=task_id)
-
 
     if not os.path.exists(base_path):
         logger.info(f"Path {base_path} does not exist")
@@ -136,6 +136,7 @@ def delete_files_except(base_path, exceptions,task_id):
         except Exception as e:
             logger.exception(f"Error deleting {item}: {str(e)}")
 
+
 def background_scraping(url, output_dir, task_id, max_workers=10):
     """Background task for site analysis and downloading."""
     try:
@@ -151,10 +152,10 @@ def background_scraping(url, output_dir, task_id, max_workers=10):
         db.close()
 
 
-def background_building_index(docs_dir: str, task_id: str,url:str):
+def background_building_index(docs_dir: str, task_id: str, url: str):
     """Background task for site analysis and downloading."""
     try:
-        buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id,scraping_url=url)
+        buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id, scraping_url=url)
 
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
@@ -176,14 +177,14 @@ def background_clustering(docs_dir, task_id, url):
             webpage_graph = os.path.join(docs_dir, 'webpage_graph.json')
 
             # Initialize and run clustering
-            cluster = DocumentClustering(task_id,docs_dir, webpage_graph)
+            cluster = DocumentClustering(task_id, docs_dir, webpage_graph)
             cluster.build_clustering_data()
 
             # Update status to completed
             db.update_clustering_status(task_id, 'completed')
 
             exceptions = ['webpage_graph.json', 'clustering_data']
-            delete_files_except(docs_dir, exceptions,task_id)
+            delete_files_except(docs_dir, exceptions, task_id)
 
         except Exception as e:
             error_msg = str(e)
@@ -193,6 +194,7 @@ def background_clustering(docs_dir, task_id, url):
             db.close()
     except Exception as e:
         logger.error(f"Critical error in clustering thread: {str(e)}")
+
 
 @app.route('/api/scrape_web', methods=['GET'])
 def scrape_web():
@@ -286,7 +288,7 @@ def build_text_index(task_id):
         # Start background thread
         thread = threading.Thread(
             target=background_building_index,
-            args=(docs_dir, task_id,url)
+            args=(docs_dir, task_id, url)
         )
         thread.daemon = True
         thread.start()
@@ -298,6 +300,8 @@ def build_text_index(task_id):
         }), 202
     finally:
         db.close()
+
+
 @app.route('/api/text_indexes', methods=['GET'])
 def get_all_building_text_index():
     """Get the status of a scraping task."""
@@ -354,9 +358,47 @@ def get_build_text_index_status(task_id):
         if not status:
             return jsonify({
                 "error": "Task not found"
-            }), 404
+            })
 
         return jsonify(status)
+    finally:
+        db.close()
+
+
+@app.route('/api/clustering_status/<task_id>', methods=['GET'])
+def get_clustering_status(task_id):
+    """Get the status of a scraping task."""
+    db = SearchEngineDatabase()
+    try:
+        index_status = db.get_building_text_index_status(task_id)
+        if not index_status:
+            # Check if task exists but status not yet set
+            task_exists = db.get_web_scraping_status(task_id)
+            if task_exists:
+                return jsonify({
+                    "status": "pending",
+                    "message": "Task initialized, waiting for status update"
+                }), 202
+            return jsonify({
+                "error": "Task not found"
+            }), 404
+
+        clustering_status = db.get_clustering_status(task_id)
+
+        if clustering_status and clustering_status.get('status') == 'completed':
+            return jsonify(index_status)
+
+        return jsonify({
+            "status": 'clustering'
+        })
+
+    except Exception as e:
+        logger.error(f"Clustering status error for task {task_id}: {str(e)}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Internal server error",
+            "error": str(e)
+        }), 500
     finally:
         db.close()
 
@@ -461,7 +503,7 @@ def search_text(task_id):
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             index_path = os.path.join(parent_dir, 'index_data', f"{task_id}.pkl")
             searcher = TextSearch(index_path=index_path)
-            results = searcher.search(query, top_k=5)
+            results = searcher.search(query, top_k=10)
             return jsonify(convert_numpy_types(results))
 
         finally:
