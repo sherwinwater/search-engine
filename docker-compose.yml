@@ -8,9 +8,9 @@ services:
     expose:
       - 5009
     volumes:
-      - /data/index_data:/app/index_data
-      - /data/scraped_data:/app/scraped_data
-      - /data/db:/app/api/search_engine.db
+      - /home/ubuntu/data/index_data:/app/index_data
+      - /home/ubuntu/data/scraped_data:/app/scraped_data
+      - /home/ubuntu/data/db:/app/api/search_engine.db
     networks:
       - app_network
 
