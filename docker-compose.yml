@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     expose:
       - 5009
+    volumes:
+      - /data/index_data:/app/index_data
+      - /data/scraped_data:/app/scraped_data
+      - /data/db:/app/api/search_engine.db
     networks:
       - app_network
 
