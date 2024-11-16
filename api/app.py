@@ -184,7 +184,7 @@ def background_clustering(docs_dir, task_id, url):
             db.update_clustering_status(task_id, 'completed')
 
             exceptions = ['webpage_graph.json', 'clustering_data']
-            delete_files_except(docs_dir, exceptions, task_id)
+            # delete_files_except(docs_dir, exceptions, task_id)
 
         except Exception as e:
             error_msg = str(e)
