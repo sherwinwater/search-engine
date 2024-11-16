@@ -11,10 +11,10 @@ from db.database import SearchEngineDatabase
 from utils.setup_logging import setup_logging
 
 class HTMLScraper:
-    def __init__(self, base_url, output_dir, task_id=None):
+    def __init__(self, base_url, output_dir, task_id=None, max_pages=51):
         parsed_url = urlparse(base_url)
-        self.domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        self.base_path = os.path.dirname(base_url)
+        self.domain = f"{parsed_url.scheme}://{parsed_url.netloc}" if max_pages != 1 else base_url
+        self.base_path = base_url
         self.output_dir = output_dir
         self.visited_urls = set()
         self.session = requests.Session()
@@ -22,9 +22,9 @@ class HTMLScraper:
         self.request_times = []
         self.downloaded_files = []
         self.downloaded_urls = set()
+        self.max_pages = max_pages
         self.db = SearchEngineDatabase()
         self.file_paths = {}  # Add this to track file paths for URLs
-
 
         self.webpage_graph_file = os.path.join(self.output_dir, 'webpage_graph.json')
 
@@ -311,158 +311,176 @@ class HTMLScraper:
         self.logger.info(f"Found {len(links)} valid links on page {current_url}")
         return links
 
-    def analyze_page(self, url):
-        """Analyze a single page and collect graph data."""
-        self.logger.info(f"Starting analysis of page: {url}")
+    # def analyze_page(self, url):
+    #     """Analyze a single page and collect graph data."""
+    #     self.logger.info(f"Starting analysis of page: {url}")
+    #
+    #     if url in self.visited_urls:
+    #         self.logger.debug(f"Skipping already visited URL: {url}")
+    #         return set()
+    #
+    #     self.visited_urls.add(url)
+    #     url_id = self.get_url_id(url)
+    #     absolute_path, file_name = self.get_absolute_path(url)  # Calculate relative path during analysis
+    #
+    #     try:
+    #         start_time = time.time()
+    #         self.logger.debug(f"Sending HEAD request to: {url}")
+    #         head_response = self.session.head(url, timeout=5)
+    #         content_type = head_response.headers.get('Content-Type', '').lower()
+    #
+    #         if 'text/html' not in content_type:
+    #             self.logger.debug(f"Skipping non-HTML content type: {content_type} for {url}")
+    #             return set()
+    #
+    #         self.logger.debug(f"Sending GET request to: {url}")
+    #         response = self.session.get(url, timeout=10)
+    #         response.raise_for_status()
+    #
+    #         request_time = time.time() - start_time
+    #         page_size = len(response.content) / 1024
+    #
+    #         self.logger.info(f"Successfully analyzed {url} - Size: {page_size:.2f}KB, Time: {request_time:.2f}s")
+    #
+    #         self.request_times.append(request_time)
+    #         self.page_sizes.append(page_size)
+    #
+    #         soup = BeautifulSoup(response.text, 'html.parser')
+    #         title = self.extract_page_title(soup) or url
+    #         labels = url.split('/')
+    #         label = next((label for label in reversed(labels) if label), 'undefined')
+    #
+    #         # Calculate page weight and metadata
+    #         page_weight = self.calculate_content_weight(soup, url)
+    #         node_metadata = {
+    #             'content_length': len(soup.get_text()),
+    #             'headers_count': len(soup.find_all(['h1', 'h2', 'h3'])),
+    #             'code_blocks': len(soup.find_all(['code', 'pre'])),
+    #             'outbound_links': 0,
+    #             'http_status': response.status_code,
+    #             'content_type': content_type,
+    #             'last_updated': time.time()
+    #         }
+    #
+    #         node = {
+    #             'id': url_id,
+    #             'url': url,
+    #             'title': title,
+    #             'filename': file_name,
+    #             'path': absolute_path,
+    #             'label': label,
+    #             'size': page_size,
+    #             'weight': page_weight,
+    #             'initial_rank': 1.0,
+    #             'final_rank': None,
+    #             'metadata': node_metadata
+    #         }
+    #
+    #         # Store file path mapping
+    #         self.file_paths[url] = absolute_path
+    #
+    #         if node not in self.graph_data['nodes']:
+    #             self.graph_data['nodes'].append(node)
+    #
+    #         # Update analysis metrics
+    #         self.update_status(
+    #             analysis={
+    #                 'pages_found': len(self.visited_urls),
+    #                 'average_page_size': round(mean(self.page_sizes), 2),
+    #                 'total_size_kb': round(sum(self.page_sizes), 2)
+    #             }
+    #         )
+    #
+    #         links = self.extract_links(soup, response.url)
+    #         # Add edges to graph data with weights
+    #         for link in links:
+    #             if link not in self.url_to_id:
+    #                 link_id = self.get_url_id(link)
+    #             else:
+    #                 link_id = self.url_to_id[link]
+    #
+    #             # Find the link element to calculate weight
+    #             link_element = soup.find('a', href=lambda x: x and (link in x or link.endswith(x.lstrip('/'))))
+    #             if link_element:
+    #                 link_weight = self.calculate_link_weight(url, link, link_element)
+    #             else:
+    #                 link_weight = 1.0  # Default weight if link element not found
+    #
+    #             edge = {
+    #                 'source': url_id,
+    #                 'target': link_id,
+    #                 'weight': link_weight,
+    #                 'metadata': {
+    #                     'link_text': link_element.get_text().strip() if link_element else '',
+    #                     'link_class': link_element.get('class', []) if link_element else [],
+    #                     'link_position': link_element.parent.name if link_element and link_element.parent else None
+    #                 }
+    #             }
+    #
+    #             if edge not in self.graph_data['links']:
+    #                 self.graph_data['links'].append(edge)
+    #                 node_metadata['outbound_links'] += 1  # Update outbound links count
+    #
+    #         self.logger.info(f"Found {len(links)} new links on page {url}")
+    #         return links
+    #
+    #     except requests.exceptions.HTTPError as e:
+    #         self.logger.error(f"HTTP Error analyzing {url}: {str(e)}")
+    #         self.visited_urls.remove(url)
+    #         if url in self.url_to_id:
+    #             del self.url_to_id[url]
+    #         return set()
+    #     except Exception as e:
+    #         self.logger.error(f"Error analyzing {url}: {str(e)}")
+    #         self.visited_urls.remove(url)
+    #         if url in self.url_to_id:
+    #             del self.url_to_id[url]
+    #         return set()
 
-        if url in self.visited_urls:
-            self.logger.debug(f"Skipping already visited URL: {url}")
-            return set()
-
-        self.visited_urls.add(url)
-        url_id = self.get_url_id(url)
-        absolute_path, file_name = self.get_absolute_path(url)  # Calculate relative path during analysis
-
-        try:
-            start_time = time.time()
-            self.logger.debug(f"Sending HEAD request to: {url}")
-            head_response = self.session.head(url, timeout=5)
-            content_type = head_response.headers.get('Content-Type', '').lower()
-
-            if 'text/html' not in content_type:
-                self.logger.debug(f"Skipping non-HTML content type: {content_type} for {url}")
-                return set()
-
-            self.logger.debug(f"Sending GET request to: {url}")
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-
-            request_time = time.time() - start_time
-            page_size = len(response.content) / 1024
-
-            self.logger.info(f"Successfully analyzed {url} - Size: {page_size:.2f}KB, Time: {request_time:.2f}s")
-
-            self.request_times.append(request_time)
-            self.page_sizes.append(page_size)
-
-            soup = BeautifulSoup(response.text, 'html.parser')
-            title = self.extract_page_title(soup) or url
-            labels = url.split('/')
-            label = next((label for label in reversed(labels) if label), 'undefined')
-
-            # Calculate page weight and metadata
-            page_weight = self.calculate_content_weight(soup, url)
-            node_metadata = {
-                'content_length': len(soup.get_text()),
-                'headers_count': len(soup.find_all(['h1', 'h2', 'h3'])),
-                'code_blocks': len(soup.find_all(['code', 'pre'])),
-                'outbound_links': 0,
-                'http_status': response.status_code,
-                'content_type': content_type,
-                'last_updated': time.time()
-            }
-
-            node = {
-                'id': url_id,
-                'url': url,
-                'title': title,
-                'filename': file_name,
-                'path': absolute_path,
-                'label': label,
-                'size': page_size,
-                'weight': page_weight,
-                'initial_rank': 1.0,
-                'final_rank': None,
-                'metadata': node_metadata
-            }
-
-            # Store file path mapping
-            self.file_paths[url] = absolute_path
-
-            if node not in self.graph_data['nodes']:
-                self.graph_data['nodes'].append(node)
-
-            # Update analysis metrics
-            self.update_status(
-                analysis={
-                    'pages_found': len(self.visited_urls),
-                    'average_page_size': round(mean(self.page_sizes), 2),
-                    'total_size_kb': round(sum(self.page_sizes), 2)
-                }
-            )
-
-            links = self.extract_links(soup, response.url)
-            # Add edges to graph data with weights
-            for link in links:
-                if link not in self.url_to_id:
-                    link_id = self.get_url_id(link)
-                else:
-                    link_id = self.url_to_id[link]
-
-                # Find the link element to calculate weight
-                link_element = soup.find('a', href=lambda x: x and (link in x or link.endswith(x.lstrip('/'))))
-                if link_element:
-                    link_weight = self.calculate_link_weight(url, link, link_element)
-                else:
-                    link_weight = 1.0  # Default weight if link element not found
-
-                edge = {
-                    'source': url_id,
-                    'target': link_id,
-                    'weight': link_weight,
-                    'metadata': {
-                        'link_text': link_element.get_text().strip() if link_element else '',
-                        'link_class': link_element.get('class', []) if link_element else [],
-                        'link_position': link_element.parent.name if link_element and link_element.parent else None
-                    }
-                }
-
-                if edge not in self.graph_data['links']:
-                    self.graph_data['links'].append(edge)
-                    node_metadata['outbound_links'] += 1  # Update outbound links count
-
-            self.logger.info(f"Found {len(links)} new links on page {url}")
-            return links
-
-        except requests.exceptions.HTTPError as e:
-            self.logger.error(f"HTTP Error analyzing {url}: {str(e)}")
-            self.visited_urls.remove(url)
-            if url in self.url_to_id:
-                del self.url_to_id[url]
-            return set()
-        except Exception as e:
-            self.logger.error(f"Error analyzing {url}: {str(e)}")
-            self.visited_urls.remove(url)
-            if url in self.url_to_id:
-                del self.url_to_id[url]
-            return set()
-
-    def analyze_site(self, max_workers=5, max_pages=100):
+    def analyze_site(self, max_workers=5):
         """
         Analyze the site structure and create graph data.
 
         Args:
             max_workers (int): Maximum number of concurrent workers
-            max_pages (int): Maximum number of pages to analyze before stopping
         """
-        self.logger.info(f"Starting site analysis with {max_workers} workers and {max_pages} page limit")
+        self.logger.info(f"Starting site analysis with {max_workers} workers and {self.max_pages} page limit")
         self.status['analysis']['start_time'] = time.time()
         self.update_status('analyzing', 'Analyzing site structure...')
 
         try:
+            # Special handling for max_pages=1: only analyze base_url
+            if self.max_pages == 1:
+                self.logger.info("Max pages set to 1, analyzing only base URL")
+                self.analyze_page(self.base_path)
+
+                self.save_graph_data()
+                self.status['graph'].update({
+                    'total_nodes': len(self.graph_data['nodes']),
+                    'total_edges': len(self.graph_data['links']),
+                    'graph_file': self.webpage_graph_file
+                })
+
+                self.status['analysis']['completion_time'] = time.time()
+                analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
+                self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
+                self.logger.info(f"Total pages found: 1 (max: 1)")
+
+                self.calculate_analysis_results(analysis_time)
+                return self.visited_urls
+
+            # Original logic for max_pages > 1
             urls_to_process = {self.base_path}
             self.logger.info(f"Initial URL to process: {self.base_path}")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 while urls_to_process:
-                    # Check if page limit has been reached
-                    if len(self.visited_urls) >= max_pages:
-                        self.logger.info(f"Reached maximum page limit of {max_pages}. Stopping analysis.")
+                    # Rest of the original code remains the same...
+                    if len(self.visited_urls) >= self.max_pages:
+                        self.logger.info(f"Reached maximum page limit of {self.max_pages}. Stopping analysis.")
                         break
 
-                    # Calculate remaining pages we can process
-                    remaining_pages = max_pages - len(self.visited_urls)
-                    # Only take as many URLs as we can process within our limit
+                    remaining_pages = self.max_pages - len(self.visited_urls)
                     batch_size = min(max_workers, remaining_pages, len(urls_to_process))
                     batch = list(urls_to_process)[:batch_size]
                     urls_to_process = set(list(urls_to_process)[batch_size:])
@@ -475,38 +493,37 @@ class HTMLScraper:
                     for future in futures:
                         try:
                             new_urls = future.result()
-                            if new_urls is not None and len(self.visited_urls) < max_pages:
+                            if new_urls is not None and len(self.visited_urls) < self.max_pages:
                                 new_unvisited_urls = {url for url in new_urls if url not in self.visited_urls}
                                 urls_to_process.update(new_unvisited_urls)
                                 self.logger.debug(f"Added {len(new_unvisited_urls)} new URLs to processing queue")
                         except Exception as e:
                             self.logger.error(f"Error processing batch: {str(e)}")
 
-                    self.logger.info(f"Analysis progress: {len(self.visited_urls)}/{max_pages} pages found, {len(urls_to_process)} in queue")
+                    self.logger.info(f"Analysis progress: {len(self.visited_urls)}/{self.max_pages} pages found, {len(urls_to_process)} in queue")
                     self.update_status(
-                        message=f"Analysis progress: {len(self.visited_urls)}/{max_pages} pages found",
+                        message=f"Analysis progress: {len(self.visited_urls)}/{self.max_pages} pages found",
                         analysis={
                             'pages_found': len(self.visited_urls),
                             'urls_in_queue': len(urls_to_process),
-                            'pages_limit': max_pages
+                            'pages_limit': self.max_pages
                         }
                     )
 
-            # Save graph data and update status
-            self.save_graph_data()
-            self.status['graph'].update({
-                'total_nodes': len(self.graph_data['nodes']),
-                'total_edges': len(self.graph_data['links']),
-                'graph_file': self.webpage_graph_file
-            })
+                self.save_graph_data()
+                self.status['graph'].update({
+                    'total_nodes': len(self.graph_data['nodes']),
+                    'total_edges': len(self.graph_data['links']),
+                    'graph_file': self.webpage_graph_file
+                })
 
-            self.status['analysis']['completion_time'] = time.time()
-            analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
-            self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
-            self.logger.info(f"Total pages found: {len(self.visited_urls)} (max: {max_pages})")
+                self.status['analysis']['completion_time'] = time.time()
+                analysis_time = self.status['analysis']['completion_time'] - self.status['analysis']['start_time']
+                self.logger.info(f"Analysis completed in {analysis_time:.2f} seconds")
+                self.logger.info(f"Total pages found: {len(self.visited_urls)} (max: {self.max_pages})")
 
-            self.calculate_analysis_results(analysis_time)
-            return self.visited_urls
+                self.calculate_analysis_results(analysis_time)
+                return self.visited_urls
 
         except Exception as e:
             self.logger.error(f"Analysis failed: {str(e)}")

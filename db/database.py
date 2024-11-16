@@ -262,7 +262,11 @@ class SearchEngineDatabase:
             domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
             # Get task data
-            cursor.execute('SELECT * FROM tasks WHERE domain = ?', (domain,))
+            cursor.execute('''
+                SELECT * FROM tasks 
+                WHERE domain = ? OR ? LIKE '%' || domain || '%'
+            ''', (domain, url))
+
             task_data = cursor.fetchone()
 
             if task_data:

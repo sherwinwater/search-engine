@@ -10,12 +10,13 @@ from sklearn.metrics import silhouette_score
 import PyPDF2
 import docx
 import pickle
-from collections import defaultdict, Counter
+from collections import defaultdict, Counter, OrderedDict
 from bs4 import BeautifulSoup
 import re
 from gensim.models import Word2Vec
 
 from db.database import SearchEngineDatabase
+from service.text_summarizer import TextSummarizer
 from utils.setup_logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,9 @@ class DocumentClustering:
         self.model = None
         self.word2vec_model = None
         self.document_vectors = None
+
+        self.summarizer = TextSummarizer()
+
         
         self.logger = setup_logging(name=f"{__name__}", task_id=self.task_id)
 
@@ -62,6 +66,72 @@ class DocumentClustering:
         with open(file_path, 'r') as f:
             self.stop_words = set(word.strip().lower() for word in f)
 
+    def generate_summary(self, text, num_sentences=2, max_chars=200):
+        """
+        Generate a summary of the given text with robust error handling and text processing.
+
+        Args:
+            text (str): Input text to summarize
+            num_sentences (int): Number of sentences to include in summary
+            max_chars (int): Maximum characters in the summary
+
+        Returns:
+            str: Generated summary or appropriate fallback text
+        """
+        try:
+            # Input validation
+            if not isinstance(text, str):
+                return "Invalid input: Text must be a string."
+
+            # Clean and normalize the text
+            cleaned_text = ' '.join(text.split())  # Remove extra whitespace
+            if not cleaned_text:
+                return "No content available for summarization."
+
+            # If text is shorter than max_chars, return it directly
+            if len(cleaned_text) <= max_chars:
+                return cleaned_text
+
+            # Ensure reasonable number of sentences
+            num_sentences = max(1, min(num_sentences, 5))  # Cap between 1 and 5 sentences
+
+            try:
+                # Attempt to generate summary using TextSummarizer
+                summary = self.summarizer.summarize(cleaned_text, num_sentences)
+
+                # If summarizer returns empty or None, fall back to text truncation
+                if not summary:
+                    raise ValueError("Summarizer returned empty result")
+
+            except Exception as summarizer_error:
+                self.logger.warning(f"Summarizer failed: {summarizer_error}. Falling back to truncation.")
+                # Fallback: Take first few sentences
+                sentences = cleaned_text.split('.')
+                summary = '. '.join(sentences[:num_sentences]) + '.'
+
+            # Ensure the summary doesn't exceed max_chars
+            if len(summary) > max_chars:
+                # Try to truncate at a sentence boundary first
+                truncated = summary[:max_chars]
+                last_period = truncated.rfind('.')
+
+                if last_period > max_chars * 0.5:  # If we can find a good sentence break
+                    summary = truncated[:last_period + 1]
+                else:
+                    # Fall back to word boundary
+                    last_space = truncated.rfind(' ')
+                    summary = truncated[:last_space] + '...'
+
+            # Final cleanup
+            summary = summary.strip()
+            if not summary.endswith(('.', '!', '?', '...')):
+                summary += '...'
+
+            return summary
+
+        except Exception as e:
+            self.logger.error(f"Error generating summary: {str(e)}")
+            return "Error generating summary."
     def clean_html_text(self, text):
         """Clean extracted HTML text"""
         # Remove extra whitespace
@@ -294,6 +364,9 @@ class DocumentClustering:
 
     def find_optimal_clusters(self, max_clusters=10):
         """Find optimal number of clusters using silhouette score"""
+        if len(self.documents) == 1:
+            return 1  # For a single document, return 1 cluster
+
         best_score = -1
         best_n = 2
 
@@ -312,6 +385,8 @@ class DocumentClustering:
         """Perform K-means clustering"""
         if n_clusters is None:
             n_clusters = self.find_optimal_clusters()
+
+        n_clusters = max(1, min(n_clusters, len(self.documents)))
 
         self.model = KMeans(n_clusters=n_clusters, random_state=42)
         self.cluster_labels = self.model.fit_predict(self.tfidf_matrix)
@@ -511,13 +586,46 @@ class DocumentClustering:
                         "cluster_id": int(label)
                     }
 
-                # Create document info
+                # Get document file type and size
+                file_path = self.file_paths[idx]
+                file_type = Path(file_path).suffix.lower()
+
+                try:
+                    file_size = os.path.getsize(file_path)
+                    file_size_mb = round(file_size / (1024 * 1024), 2)  # Convert to MB
+                except Exception as e:
+                    self.logger.warning(f"Error getting file size for {file_path}: {e}")
+                    file_size_mb = 0
+
+                # Extract text and adjust summary parameters based on file type and size
+                text = self.documents[idx]
+
+                # Adjust summary parameters based on file type and size
+                if file_type in ['.pdf', '.docx']:
+                    # For larger document types, use more sentences but keep it concise
+                    summary = self.generate_summary(text, num_sentences=3, max_chars=300)
+                elif file_type in ['.txt', '.html', '.htm']:
+                    # For web and text content, keep it shorter
+                    summary = self.generate_summary(text, num_sentences=2, max_chars=200)
+                else:
+                    # Default case
+                    summary = self.generate_summary(text, num_sentences=2, max_chars=150)
+
+                # Create document info with additional metadata
                 doc_info = {
-                    "file_path": str(self.file_paths[idx]),
+                    "file_path": str(file_path),
                     "url": str(self.urls[idx]) if idx < len(self.urls) else "",
-                    "file_type": Path(self.file_paths[idx]).suffix.lower(),
+                    "file_type": file_type,
+                    "file_size_mb": file_size_mb,
                     "index": idx,
-                    "preview": self.documents[idx][:200] + ("..." if len(self.documents[idx]) > 200 else "")
+                    "preview": summary,
+                    "metadata": {
+                        "characters": len(text),
+                        "estimated_read_time": f"{max(1, len(text.split()) // 200)} min",  # Assuming 200 words per minute
+                        "last_modified": datetime.fromtimestamp(
+                            os.path.getmtime(file_path)
+                        ).strftime("%Y-%m-%d %H:%M:%S")
+                    }
                 }
 
                 structure[cluster_name]["documents"].append(doc_info)
@@ -608,7 +716,7 @@ class DocumentClustering:
                 db.close()
 
         except Exception as e:
-            self.logger.info(f"self.task_idCRITICAL ERROR in save_results: {str(e)}")
+            self.logger.info(f"CRITICAL ERROR in save_results: {str(e)}")
             raise
 
     def _make_json_serializable(self, obj):

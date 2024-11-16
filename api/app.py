@@ -37,7 +37,7 @@ CORS(app, resources={
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',  # threading for development, useing eventlet for production
+    async_mode='eventlet',  # threading for development, useing eventlet for production
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
@@ -137,11 +137,11 @@ def delete_files_except(base_path, exceptions, task_id):
             logger.exception(f"Error deleting {item}: {str(e)}")
 
 
-def background_scraping(url, output_dir, task_id, max_workers=10):
+def background_scraping(url, output_dir, task_id, max_workers=10, max_pages=50):
     """Background task for site analysis and downloading."""
     try:
         db = SearchEngineDatabase()
-        scraper = HTMLScraper(base_url=url, output_dir=output_dir, task_id=task_id)
+        scraper = HTMLScraper(base_url=url, output_dir=output_dir, task_id=task_id, max_pages=max_pages)
         db.update_scraping_task(task_id, scraper)
 
         if scraper.analyze_site(max_workers=max_workers):
@@ -535,6 +535,7 @@ def build_index_by_url():
         # Get URL from request
         data = request.get_json()
         url = data.get('url')
+        max_pages = data.get('max_pages', 50)
 
         if not url:
             return jsonify({
@@ -573,7 +574,7 @@ def build_index_by_url():
                 # Start scraping in background
                 thread = threading.Thread(
                     target=background_scraping,
-                    args=(url, abs_destination_path, task_id, 10)
+                    args=(url, abs_destination_path, task_id, 10, max_pages)
                 )
                 thread.daemon = True
                 thread.start()

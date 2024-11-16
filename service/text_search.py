@@ -107,7 +107,7 @@ class TextSearch:
 
         return tokens
 
-    def search(self, query: str, top_k: int = 5, min_score: float = 0.0) -> List[Dict[str, Union[str, float]]]:
+    def search(self, query: str, top_k: int = 5, min_score: float = -30) -> List[Dict[str, Union[str, float]]]:
         """
         Search the indexed documents using BM25
 
