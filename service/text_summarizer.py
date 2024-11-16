@@ -1,14 +1,18 @@
 import os
-
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 import re
 from typing import List, Set
+from scipy.sparse import csr_matrix
+from sklearn.preprocessing import normalize
+import warnings
+
 
 class TextSummarizer:
-    def __init__(self):
+    def __init__(self, max_sentences: int = 10000):
         self.stop_words_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "stopwords.txt"))
         self.load_stopwords(self.stop_words_path)
+        self.max_sentences = max_sentences
 
     def load_stopwords(self, file_path):
         with open(file_path, 'r') as f:
@@ -48,57 +52,88 @@ class TextSummarizer:
 
         return ' '.join(words)
 
-    def create_similarity_matrix(self, sentences: List[str]) -> np.ndarray:
-        """Create similarity matrix between sentences using TF-IDF."""
+    def create_similarity_matrix(self, sentences: List[str]) -> csr_matrix:
+        """Create similarity matrix between sentences using TF-IDF with sparse matrices."""
         # Create TF-IDF matrix
-        tfidf = TfidfVectorizer()
+        tfidf = TfidfVectorizer(max_features=5000)  # Limit features to control memory
         tfidf_matrix = tfidf.fit_transform([self.preprocess_text(sent)
                                             for sent in sentences])
 
-        # Calculate similarity matrix
-        similarity_matrix = (tfidf_matrix * tfidf_matrix.T).toarray()
+        # Calculate similarity matrix using sparse operations
+        similarity_matrix = (tfidf_matrix * tfidf_matrix.T)
 
         return similarity_matrix
 
-    def rank_sentences(self, similarity_matrix: np.ndarray) -> List[float]:
-        """Implement a simplified ranking algorithm."""
+    def rank_sentences(self, similarity_matrix: csr_matrix) -> List[float]:
+        """Implement memory-efficient ranking algorithm using sparse matrices."""
         # Calculate sentence scores based on similarity
-        scores = np.sum(similarity_matrix, axis=1)
+        scores = np.array(similarity_matrix.sum(axis=1)).flatten()
 
         # Normalize scores
-        scores = scores / np.max(scores)
+        max_score = np.max(scores) if scores.size > 0 else 1
+        if max_score != 0:
+            scores = scores / max_score
 
         return scores.tolist()
 
+    def truncate_text(self, sentences: List[str], max_sentences: int) -> List[str]:
+        """Intelligently truncate text to handle very long documents."""
+        if len(sentences) <= max_sentences:
+            return sentences
+
+        # Keep introduction and conclusion
+        intro_size = max_sentences // 4
+        conclusion_size = max_sentences // 4
+        middle_size = max_sentences - (intro_size + conclusion_size)
+
+        return (sentences[:intro_size] +
+                sentences[len(sentences) // 2 - middle_size // 2:len(sentences) // 2 + middle_size // 2] +
+                sentences[-conclusion_size:])
+
     def summarize(self, text: str, num_sentences: int = 3) -> str:
-        """Generate summary of the text."""
+        """Generate summary of the text with memory optimization."""
         # Split text into sentences
         sentences = self.split_into_sentences(text)
 
         if len(sentences) <= num_sentences:
             return text
 
-        # Create similarity matrix
-        similarity_matrix = self.create_similarity_matrix(sentences)
+        # Handle very long texts
+        if len(sentences) > self.max_sentences:
+            warnings.warn(f"Text has {len(sentences)} sentences. Truncating to {self.max_sentences} sentences.")
+            sentences = self.truncate_text(sentences, self.max_sentences)
 
-        # Rank sentences
-        scores = self.rank_sentences(similarity_matrix)
+        try:
+            # Create similarity matrix
+            similarity_matrix = self.create_similarity_matrix(sentences)
 
-        # Create sentence-score pairs and sort by score
-        ranked_sentences = sorted(
-            [(score, i, sentence)
-             for i, (score, sentence) in enumerate(zip(scores, sentences))],
-            reverse=True
-        )
+            # Rank sentences
+            scores = self.rank_sentences(similarity_matrix)
 
-        # Select top sentences and sort by original position
-        selected_sentences = sorted(
-            ranked_sentences[:num_sentences],
-            key=lambda x: x[1]  # Sort by original position
-        )
+            # Create sentence-score pairs and sort by score
+            ranked_sentences = sorted(
+                [(score, i, sentence)
+                 for i, (score, sentence) in enumerate(zip(scores, sentences))],
+                reverse=True
+            )
 
-        # Join sentences to create summary
-        summary = ' '.join(sentence for _, _, sentence in selected_sentences)
+            # Select top sentences and sort by original position
+            selected_sentences = sorted(
+                ranked_sentences[:num_sentences],
+                key=lambda x: x[1]  # Sort by original position
+            )
+
+            # Join sentences to create summary
+            summary = ' '.join(sentence for _, _, sentence in selected_sentences)
+
+        except MemoryError:
+            warnings.warn("Memory error occurred. Falling back to simple extraction.")
+            # Simple fallback: Take first and last sentences, plus evenly spaced sentences in between
+            if num_sentences >= len(sentences):
+                return text
+
+            indices = np.linspace(0, len(sentences) - 1, num_sentences, dtype=int)
+            summary = ' '.join(sentences[i] for i in indices)
 
         return summary
 
@@ -106,7 +141,6 @@ class TextSummarizer:
                             sentences_per_doc: int = 3) -> List[str]:
         """Summarize multiple documents."""
         return [self.summarize(doc, sentences_per_doc) for doc in documents]
-
 
 # Example usage
 def main():

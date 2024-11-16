@@ -34,10 +34,17 @@ CORS(app, resources={
     }
 })
 
+flask_env = os.getenv('FLASK_ENV', 'development')
+
+if flask_env == 'development':
+    async_mode = 'threading'
+else:
+    async_mode = 'eventlet'
+
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='eventlet',  # threading for development, useing eventlet for production
+    async_mode=async_mode,  # threading for development, useing eventlet for production
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
