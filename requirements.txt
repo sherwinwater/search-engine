@@ -21,3 +21,6 @@ gensim==4.3.3
 
 ## text summarization
 networkx==3.4.2
+
+## fuzzy search
+RapidFuzz==3.10.1

@@ -510,7 +510,7 @@ def search_text(task_id):
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             index_path = os.path.join(parent_dir, 'index_data', f"{task_id}.pkl")
             searcher = TextSearch(index_path=index_path)
-            results = searcher.search(query, top_k=10)
+            results = searcher.search_with_suggestions(query)
             return jsonify(convert_numpy_types(results))
 
         finally:
