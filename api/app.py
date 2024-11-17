@@ -35,7 +35,7 @@ CORS(app, resources={
 })
 
 flask_env = os.getenv('FLASK_ENV', 'development')
-async_mod = 'eventlet' if flask_env == 'production' else 'threading'
+async_mode = 'eventlet' if flask_env == 'production' else 'threading'
 
 socketio = SocketIO(
     app,
