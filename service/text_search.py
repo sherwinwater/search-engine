@@ -4,6 +4,10 @@ from typing import List, Dict, Union, Tuple
 import numpy as np
 import logging
 import re
+from rapidfuzz import process, fuzz
+from nltk.corpus import stopwords, wordnet
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 class TextSearch:
@@ -20,6 +24,8 @@ class TextSearch:
         self.tokenized_docs = None
         self.stop_words = set()
         self.doc_ids = []  # Add document IDs list
+        self.stop_words = set(stopwords.words('english'))
+        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
         # Load the index
         self._load_index()
@@ -32,7 +38,6 @@ class TextSearch:
                 self.bm25 = index_data.get('bm25')
                 self.documents = index_data.get('documents')
                 self.tokenized_docs = index_data.get('tokenized_docs')
-                self.stop_words = index_data.get('stop_words', set())
 
             if not all([self.bm25, self.documents, self.tokenized_docs]):
                 raise ValueError("Index file is missing required components")
@@ -69,116 +74,101 @@ class TextSearch:
         self.doc_ids = [doc['id'] for doc in self.documents]
 
     def _tokenize(self, text: str) -> List[str]:
-        """
-        Simple tokenization function that splits on whitespace and punctuation
-
-        Args:
-            text (str): Input text to tokenize
-
-        Returns:
-            List[str]: List of tokens
-        """
-        # Convert to lowercase
-        text = text.lower()
-
-        # Replace punctuation with spaces
-        text = re.sub(r'[^\w\s]', ' ', text)
-
-        # Split on whitespace and filter empty strings
-        tokens = [token.strip() for token in text.split() if token.strip()]
-
-        return tokens
+        """Tokenize text into words"""
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        return list(filter(None, map(str.strip, text.split())))
 
     def preprocess_query(self, query: str) -> List[str]:
-        """
-        Preprocess and tokenize the search query
-
-        Args:
-            query (str): Raw search query
-
-        Returns:
-            List[str]: Tokenized and processed query
-        """
-        # Tokenize
+        """Preprocess and tokenize the search query"""
         tokens = self._tokenize(query)
-
-        # Remove stopwords
         tokens = [token for token in tokens if token not in self.stop_words]
-
+        tokens = self.correct_spelling(tokens)
         return tokens
 
+    def correct_spelling(self, tokens: List[str]) -> List[str]:
+        """Correct spelling in the query using RapidFuzz for fuzzy matching"""
+        corrected_tokens = []
+        for token in tokens:
+            best_match = process.extractOne(token, self.bm25.idf.keys(), scorer=fuzz.ratio)
+            if best_match and best_match[1] > 80:
+                corrected_tokens.append(best_match[0])
+            else:
+                corrected_tokens.append(token)
+        return corrected_tokens
+
+    def fuzzy_match_content(self, query: List[str], document: str) -> float:
+        """Calculate fuzzy match score between query tokens and document content"""
+        scores = []
+        for token in query:
+            match = process.extractOne(token, document.split(), scorer=fuzz.ratio)
+            if match:
+                scores.append(match[1])
+        return np.mean(scores) if scores else 0.0
+
+    def combine_scores(self, bm25_score: float, semantic_score: float, fuzzy_score: float) -> float:
+        """Combine BM25, semantic, and fuzzy scores into a single score"""
+        weights = {"bm25": 0.3, "semantic": 0.5, "fuzzy": 0.2}
+        return (
+            weights["bm25"] * bm25_score +
+            weights["semantic"] * semantic_score +
+            weights["fuzzy"] * fuzzy_score
+        )
+
     def search(self, query: str, top_k: int = 5, min_score: float = 0.0) -> List[Dict[str, Union[str, float]]]:
-        """
-        Search the indexed documents using BM25
-
-        Args:
-            query (str): Search query
-            top_k (int): Number of top results to return
-            min_score (float): Minimum score threshold for results
-
-        Returns:
-            List[Dict]: List of dictionaries containing document content and scores
-        """
+        """Search the indexed documents using BM25, fuzzy match, and semantic ranking"""
         try:
-            # Preprocess query
             tokenized_query = self.preprocess_query(query)
-
             if not tokenized_query:
                 logging.warning("Empty query after preprocessing")
                 return []
 
-            # Get BM25 scores
             scores = self.bm25.get_scores(tokenized_query)
-
-            # Get top k document indices
             top_indices = np.argsort(scores)[::-1][:top_k]
 
-            # Prepare results
             results = []
             for idx in top_indices:
                 if scores[idx] > min_score:
                     doc = self.documents[idx]
+                    content = doc['content']
+                    fuzzy_score = self.fuzzy_match_content(tokenized_query, content)
                     result = {
-                        'content': doc['content'],
+                        'content': content,
                         'metadata': doc['metadata'],
-                        'score': float(scores[idx]),
-                        'document_id': doc['id'],
-                        'position': idx,
-                        'filename': doc.get('filename', ''),
-                        'filepath': doc.get('filepath', ''),
-                        'url': doc.get('url', '')
+                        'bm25_score': float(scores[idx]),
+                        'fuzzy_score': fuzzy_score/100,
+                        'document_id': doc['id']
                     }
                     results.append(result)
 
-            return results
+            if self.embedder:
+                results = self.rerank_with_semantics(query, results)
+
+            for result in results:
+                result['score'] = self.combine_scores(
+                    bm25_score=result['bm25_score'],
+                    semantic_score=result.get('semantic_score', 0.0),
+                    fuzzy_score=result['fuzzy_score']
+                )
+
+            return sorted(results, key=lambda x: x['score'], reverse=True)[:top_k]
 
         except Exception as e:
             logging.error(f"Error during search: {str(e)}")
             raise
 
-    def get_document_by_id(self, doc_id: str) -> Dict:
-        """
-        Retrieve a specific document by its ID
+    def rerank_with_semantics(self, query: str, results: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Union[str, float]]]:
+        """Rerank search results using Sentence-BERT embeddings"""
+        query_embedding = self.embedder.encode([query])
+        doc_embeddings = self.embedder.encode([result['content'] for result in results])
+        cosine_similarities = cosine_similarity(query_embedding, doc_embeddings).flatten()
 
-        Args:
-            doc_id (str): Document ID to retrieve
+        for i, result in enumerate(results):
+            result['semantic_score'] = float(cosine_similarities[i])
 
-        Returns:
-            Dict: Document content and metadata
-        """
-        try:
-            idx = self.doc_ids.index(doc_id)
-            return self.documents[idx]
-        except ValueError:
-            return None
+        return sorted(results, key=lambda x: x['semantic_score'], reverse=True)
 
     def get_index_stats(self) -> Dict:
-        """
-        Get statistics about the loaded index
-
-        Returns:
-            Dict: Index statistics
-        """
+        """Get statistics about the loaded index"""
         return {
             'num_documents': len(self.documents),
             'index_path': self.index_path,
@@ -188,23 +178,20 @@ class TextSearch:
         }
 
 if __name__ == "__main__":
+    searcher = TextSearch(index_path='../index_data/5ca59887-5717-4cab-bc0e-0f98bfb5964e.pkl')
+    query = 'physvics H?andvles the pvhysic sivmulation'
+    # query = 'physics Handles the physics simulation'
+    # query = 'the the the a so'
+    results = searcher.search(query, top_k=5)
+    # print(results[0].keys())
+    # dict_keys(['content', 'metadata', 'bm25_score', 'fuzzy_score', 'document_id', 'semantic_score', 'score'])
 
-    index_path = "/Users/shuwenwang/Documents/dev/uiuc/search-engine/index_data/9a66bea3-4dff-4aa3-9dd3-f93a2a55665e.pkl"
-
-    # Initialize the search
-    searcher = TextSearch(index_path=index_path)
-
-    # Perform a search
-    results = searcher.search("what is storm?", top_k=5)
-
-    # Print results
     for result in results:
-        print(f"Score: {result['score']}")
+        print(f"Score: combined {result['score']:.3f}, semantic {result['semantic_score']:.3f}, bm25 {result['bm25_score']:.3f}, fuzzy {result['fuzzy_score']:.3f}")
         print(f"Content: {result['content'][:200]}...")  # First 200 chars
         print(f"Document ID: {result['document_id']}")
         print("---")
 
-    # Get index statistics
-    stats = searcher.get_index_stats()
-    print(f"Total documents: {stats['num_documents']}")
-
+    # # Get index statistics
+    # stats = searcher.get_index_stats()
+    # print(f"Total documents: {stats['num_documents']}")
