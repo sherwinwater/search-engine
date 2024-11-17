@@ -8,7 +8,7 @@ services:
     volumes:
       - /home/ubuntu/data/index_data:/app/index_data
       - /home/ubuntu/data/scraped_data:/app/scraped_data
-      - /home/ubuntu/data/db:/app/db
+#      - /home/ubuntu/data/db:/app/db
     networks:
       - app_network
 

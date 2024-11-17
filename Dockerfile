@@ -14,8 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Create db directory and set permissions
-RUN mkdir -p /app/db && chmod 777 /app/db
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -23,7 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-RUN chmod 777 /app/db
 # Expose port
 EXPOSE 5009
 
