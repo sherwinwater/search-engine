@@ -5,7 +5,6 @@ import numpy as np
 import logging
 import re
 from rapidfuzz import process, fuzz
-from nltk.corpus import stopwords, wordnet
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -24,8 +23,7 @@ class TextSearch:
         self.bm25 = None
         self.documents = None
         self.tokenized_docs = None
-        self.stop_words = set()
-        self.stop_words = set(stopwords.words('english'))
+        self.stop_words = set(open('stopwords.txt').read().splitlines())
         self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
         self.doc_ids = []
         self.min_similarity = min_similarity
@@ -154,18 +152,10 @@ class TextSearch:
 
         return tokens
 
-    # def fuzzy_match_content(self, query: List[str], document: str) -> float:
-    #     """Calculate fuzzy match score between query tokens and document content"""
-    #     scores = []
-    #     for token in query:
-    #         match = process.extractOne(token, document.split(), scorer=fuzz.ratio)
-    #         if match:
-    #             scores.append(match[1])
-    #     return np.mean(scores) if scores else 0.0
 
     def combine_scores(self, bm25_score: float, semantic_score: float) -> float:
         """Combine BM25 and semantic scores into a single score"""
-        weights = {'bm25': 0.3, 'semantic': 0.5}
+        weights = {'bm25': 0.5, 'semantic': 0.5}
         return weights['bm25'] * bm25_score + weights['semantic'] * semantic_score
 
     def search(self,
