@@ -124,7 +124,38 @@ class SearchEngineDatabase:
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     is_completed BOOLEAN DEFAULT FALSE,
-                    error TEXT
+                    error TEXT,
+                    scraping_url TEXT
+                )
+            ''')
+
+            self.cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS clustering (
+                            task_id TEXT PRIMARY KEY,
+                            status TEXT,  -- 'processing', 'completed', 'failed'
+                            num_clusters INTEGER,
+                            cluster_structure_path TEXT,
+                            metadata_path TEXT,
+                            model_path TEXT,
+                            summary_path TEXT,
+                            error_message TEXT,
+                            start_time REAL,
+                            completion_time REAL,
+                            FOREIGN KEY (task_id) REFERENCES tasks(task_id)
+                        )
+                    ''')
+
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS cluster_details (
+                    cluster_id TEXT,
+                    task_id TEXT,
+                    cluster_name TEXT,
+                    size INTEGER,
+                    keywords TEXT,  -- Stored as JSON array
+                    document_paths TEXT,  -- Stored as JSON array
+                    document_urls TEXT,   -- Stored as JSON array
+                    PRIMARY KEY (cluster_id, task_id),
+                    FOREIGN KEY (task_id) REFERENCES clustering(task_id)
                 )
             ''')
 
@@ -231,7 +262,11 @@ class SearchEngineDatabase:
             domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
             # Get task data
-            cursor.execute('SELECT * FROM tasks WHERE domain = ?', (domain,))
+            cursor.execute('''
+                SELECT * FROM tasks 
+                WHERE domain = ? OR ? LIKE '%' || domain || '%'
+            ''', (domain, url))
+
             task_data = cursor.fetchone()
 
             if task_data:
@@ -335,8 +370,8 @@ class SearchEngineDatabase:
                     total_files, processed_files, failed_files,
                     progress_percentage, current_file, start_time,
                     completion_time, created_at, updated_at,
-                    is_completed, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_completed, error,scraping_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
             ''', (
                 task_id,
                 text_index.docs_dir,
@@ -353,7 +388,8 @@ class SearchEngineDatabase:
                 current_time,
                 current_time,
                 getattr(text_index, 'is_completed', False),
-                getattr(text_index, 'error', None)
+                getattr(text_index, 'error', None),
+                getattr(text_index, 'scraping_url', '')
             ))
 
             conn.commit()
@@ -373,7 +409,7 @@ class SearchEngineDatabase:
                        total_files, processed_files, failed_files,
                        progress_percentage, current_file, start_time,
                        completion_time, created_at, updated_at,
-                       is_completed, error
+                       is_completed, error,scraping_url
                 FROM text_index 
                 WHERE task_id = ?
             ''', (task_id,))
@@ -396,7 +432,8 @@ class SearchEngineDatabase:
                     'created_at': result[12],
                     'updated_at': result[13],
                     'is_completed': bool(result[14]),
-                    'error': result[15]
+                    'error': result[15],
+                    'scraping_url': result[16]
                 }
             return None
         except sqlite3.Error as e:
@@ -404,15 +441,48 @@ class SearchEngineDatabase:
             return None
 
     def get_all_building_text_index(self):
-        """Get all text index building statuses"""
+        """Get all text index building statuses
+
+        Returns:
+            list: List of dictionaries containing text index data with named fields
+        """
         try:
             self.cursor.execute('''
-                SELECT *
+                SELECT task_id, docs_dir, index_path, status, message,
+                       total_files, processed_files, failed_files,
+                       progress_percentage, current_file, start_time,
+                       completion_time, created_at, updated_at,
+                       is_completed, error,scraping_url
                 FROM text_index 
+                order by created_at desc
             ''')
 
             results = self.cursor.fetchall()
-            return results
+
+            # Convert results to list of dictionaries with named fields
+            formatted_results = []
+            for row in results:
+                formatted_results.append({
+                    'task_id': row[0],
+                    'docs_dir': row[1],
+                    'index_path': row[2],
+                    'status': row[3],
+                    'message': row[4],
+                    'total_files': row[5],
+                    'processed_files': row[6],
+                    'failed_files': row[7],
+                    'progress_percentage': row[8],
+                    'current_file': row[9],
+                    'start_time': row[10],
+                    'completion_time': row[11],
+                    'created_at': row[12],
+                    'updated_at': row[13],
+                    'is_completed': row[14],
+                    'error': row[15],
+                    'scraping_url': row[16]
+                })
+
+            return formatted_results
         except sqlite3.Error as e:
             logger.error(f"Error retrieving building status: {e}")
             return []
@@ -489,6 +559,174 @@ class SearchEngineDatabase:
         except Exception as e:
             logger.error(f"Unexpected error while getting build index by URL: {e}")
             return None
+
+    def start_clustering(self, task_id):
+        """Record the start of clustering process"""
+        try:
+            current_time = time.time()
+            self.cursor.execute('''
+                INSERT INTO clustering (
+                    task_id, status, start_time
+                ) VALUES (?, ?, ?)
+                ON CONFLICT(task_id) DO UPDATE SET
+                    status = ?,
+                    start_time = ?,
+                    completion_time = NULL,
+                    error_message = NULL
+            ''', (task_id, 'processing', current_time, 'processing', current_time))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error starting clustering: {e}")
+            raise
+
+    def update_clustering_status(self, task_id, status, error_message=None):
+        """Update clustering status and completion time"""
+        try:
+            current_time = time.time()
+            if status == 'completed':
+                self.cursor.execute('''
+                    UPDATE clustering 
+                    SET status = ?, completion_time = ?, error_message = ?
+                    WHERE task_id = ?
+                ''', (status, current_time, error_message, task_id))
+            else:
+                self.cursor.execute('''
+                    UPDATE clustering 
+                    SET status = ?, error_message = ?
+                    WHERE task_id = ?
+                ''', (status, error_message, task_id))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error updating clustering status: {e}")
+            raise
+
+    def save_cluster_details(self, task_id, cluster_structure):
+        """Save individual cluster details to database"""
+        try:
+            # First, delete any existing cluster details for this task
+            self.cursor.execute('''
+                DELETE FROM cluster_details WHERE task_id = ?
+            ''', (task_id,))
+
+            # Insert new cluster details
+            for cluster_name, cluster_data in cluster_structure.items():
+                cluster_id = f"{task_id}_{cluster_data['cluster_id']}"
+
+                # Convert document lists to JSON strings
+                document_paths = json.dumps([doc['file_path'] for doc in cluster_data['documents']])
+                document_urls = json.dumps([doc['url'] for doc in cluster_data['documents']])
+                keywords = json.dumps(cluster_data['keywords'])
+
+                self.cursor.execute('''
+                    INSERT INTO cluster_details (
+                        cluster_id, task_id, cluster_name, size, 
+                        keywords, document_paths, document_urls
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    cluster_id, task_id, cluster_name, cluster_data['size'],
+                    keywords, document_paths, document_urls
+                ))
+
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error saving cluster details: {e}")
+            raise
+
+    def save_clustering_paths(self, task_id, structure_path, metadata_path, model_path, summary_path, num_clusters):
+        """Save paths to clustering output files"""
+        try:
+            # First, make sure there's a record in the clustering table
+            self.cursor.execute('''
+                INSERT INTO clustering (task_id, status)
+                VALUES (?, 'processing')
+                ON CONFLICT(task_id) DO NOTHING
+            ''', (task_id,))
+
+            # Then update the paths
+            self.cursor.execute('''
+                UPDATE clustering 
+                SET cluster_structure_path = ?,
+                    metadata_path = ?,
+                    model_path = ?,
+                    summary_path = ?,
+                    num_clusters = ?
+                WHERE task_id = ?
+            ''', (structure_path, metadata_path, model_path, summary_path, num_clusters, task_id))
+            self.conn.commit()
+        except Exception as e:
+            print(f"Error saving clustering paths: {e}")
+            raise
+
+    def get_clustering_status(self, task_id):
+        """Get current clustering status"""
+        try:
+            self.cursor.execute('''
+                SELECT status, error_message, start_time, completion_time
+                FROM clustering
+                WHERE task_id = ?
+            ''', (task_id,))
+            result = self.cursor.fetchone()
+            if result:
+                return {
+                    'status': result[0],
+                    'error_message': result[1],
+                    'start_time': result[2],
+                    'completion_time': result[3]
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting clustering status: {e}")
+            raise
+
+    def get_clustering_info(self, task_id):
+        """Get all clustering information for a task"""
+        try:
+            # Get main clustering info
+            self.cursor.execute('''
+                SELECT * FROM clustering WHERE task_id = ?
+            ''', (task_id,))
+            clustering = self.cursor.fetchone()
+
+            if not clustering:
+                return None
+
+            # Get cluster details
+            self.cursor.execute('''
+                SELECT * FROM cluster_details WHERE task_id = ?
+            ''', (task_id,))
+            clusters = self.cursor.fetchall()
+
+            # Convert to dictionary
+            clustering_dict = {
+                "task_id": clustering[0],
+                "status": clustering[1],
+                "num_clusters": clustering[2],
+                "file_paths": {
+                    "structure": clustering[3],
+                    "metadata": clustering[4],
+                    "model": clustering[5],
+                    "summary": clustering[6]
+                },
+                "error_message": clustering[7],
+                "start_time": clustering[8],
+                "completion_time": clustering[9],
+                "clusters": [
+                    {
+                        "cluster_id": c[0],
+                        "cluster_name": c[2],
+                        "size": c[3],
+                        "keywords": json.loads(c[4]),
+                        "document_paths": json.loads(c[5]),
+                        "document_urls": json.loads(c[6])
+                    }
+                    for c in clusters
+                ]
+            }
+
+            return clustering_dict
+        except Exception as e:
+            print(f"Error getting clustering info: {e}")
+            raise
     def close(self):
         """Close all thread-local connections"""
         self.thread_safe_db.close()

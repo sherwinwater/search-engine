@@ -1,4 +1,6 @@
 ./idea
 ./test
-.scraped_data
 .vercel
+/scraped_data
+/index_data
+/db/search_engine.dbdb/search_engine.db

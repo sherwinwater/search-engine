@@ -17,16 +17,20 @@ from utils.setup_logging import setup_logging
 
 
 class BuildTextIndex:
-    def __init__(self, docs_dir: str, task_id: str):
-        self.docs_dir = docs_dir
+    def __init__(self, docs_dir: str, task_id: str, scraping_url:str=''):
+        # Convert docs_dir to absolute path if it's not already
+        self.docs_dir = os.path.abspath(docs_dir)
         self.documents: List[Dict] = []
         self.bm25 = None
         self.tokenized_docs = None
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+        # Get absolute path for parent directory
+        parent_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
+        # Use absolute paths for index and stopwords
         self.index_path = os.path.join(parent_dir, "index_data", f"{task_id}.pkl")
-        self.stop_words_path = os.path.join(os.path.dirname(__file__), "stopwords.txt")
-        
+        self.stop_words_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "stopwords.txt"))
+
         self.logger = setup_logging(name=f"{__name__}", task_id=task_id)
 
         self.load_stopwords(self.stop_words_path)
@@ -36,12 +40,13 @@ class BuildTextIndex:
         self.start_time = datetime.now()
         self.completion_time = None
         self.is_completed = False
-        self.total_files =0
+        self.total_files = 0
         self.error = ''
         self.failed_files = 0
-        self.processed_files =0
-        self.current_file =''
+        self.processed_files = 0
+        self.current_file = ''
         self.progress_percentage = 0
+        self.scraping_url = scraping_url
 
         self.db = SearchEngineDatabase()
         self.db.update_text_index(
@@ -50,7 +55,7 @@ class BuildTextIndex:
         )
 
         self.page_data = {}
-        self.load_webpage_graph(docs_dir)
+        self.load_webpage_graph(self.docs_dir)
 
     def load_webpage_graph(self, docs_dir: str):
         """Load webpage graph data with both URL mapping and rank information."""
@@ -59,7 +64,6 @@ class BuildTextIndex:
             with open(graph_file, 'r', encoding='utf-8') as f:
                 graph_data = json.load(f)
                 for node in graph_data['nodes']:
-                    # Create a complete data structure for each page
                     page_info = {
                         'url': node.get('url', ''),
                         'final_rank': node.get('final_rank', 0.0),
@@ -69,71 +73,32 @@ class BuildTextIndex:
                         'title': node.get('title', '')
                     }
 
-                    # Store by path
+                    # Get path from node
                     path = node.get('path', '')
                     if not path:
-                        path = node.get('relative_path', '')
+                        relative_path = node.get('relative_path', '')
+                        if relative_path:
+                            # Convert relative path to absolute path
+                            path = os.path.abspath(os.path.join(docs_dir, relative_path))
+                        else:
+                            continue  # Skip if no valid path found
 
-                    if path:
-                        # Normalize path (handle Windows/Unix path differences)
-                        normalized_path = path.replace('\\', '/')
-                        self.page_data[normalized_path] = page_info
+                    # Convert to absolute path and normalize
+                    abs_path = os.path.abspath(path)
+                    normalized_path = abs_path.replace('\\', '/')
 
-                        # Also store with original path for compatibility
-                        self.page_data[path] = page_info
+                    # Store both normalized and original absolute paths
+                    self.page_data[normalized_path] = page_info
+                    self.page_data[abs_path] = page_info
 
-    def get_page_info(self, filepath: str) -> Optional[Dict]:
-        """Get URL and rank information for a given filepath."""
-        relative_path = os.path.relpath(filepath, self.docs_dir)
+                    # Also store relative path from docs_dir for reference
+                    try:
+                        rel_path = os.path.relpath(abs_path, docs_dir)
+                        self.page_data[rel_path] = page_info
+                    except ValueError:
+                        # Handle case where paths are on different drives
+                        pass
 
-        # Try different path formats
-        paths_to_try = [
-            relative_path,
-            relative_path.replace('\\', '/'),  # Normalized path
-            os.path.basename(relative_path)  # Just filename
-        ]
-
-        for path in paths_to_try:
-            if path in self.page_data:
-                return self.page_data[path]
-
-        return None
-
-    def get_document_rank_score(self, doc: Dict) -> float:
-        """Calculate a combined rank score for a document."""
-        if not any(k in doc for k in ['final_rank', 'initial_rank', 'weight']):
-            return 1.0  # Default weight if no rank data found
-
-        # Calculate combined score using available metrics
-        final_rank = doc.get('final_rank', 0.0)
-        initial_rank = doc.get('initial_rank', 1.0)
-        weight = doc.get('weight', 1.0)
-
-        # Get content quality indicators from metadata
-        metadata = doc.get('metadata', {})
-        content_length = metadata.get('content_length', 0)
-        code_blocks = metadata.get('code_blocks', 0)
-        outbound_links = metadata.get('outbound_links', 0)
-
-        # Normalize content length (assuming average length of 5000)
-        normalized_length = min(content_length / 5000, 1.0) if content_length else 0.5
-
-        # Calculate content quality score
-        content_score = (
-                normalized_length * 0.4 +
-                min(code_blocks / 10, 1.0) * 0.3 +
-                min(outbound_links / 20, 1.0) * 0.3
-        )
-
-        # Combine different ranking factors
-        combined_score = (
-                final_rank * 0.4 +
-                initial_rank * 0.2 +
-                weight * 0.2 +
-                content_score * 0.2
-        )
-
-        return max(combined_score, 0.1)
     def load_stopwords(self, file_path):
         with open(file_path, 'r') as f:
             self.stop_words = set(word.strip().lower() for word in f)
@@ -172,23 +137,80 @@ class BuildTextIndex:
                     text.append(page.extract_text())
             return self.clean_text(' '.join(text))
         except Exception as e:
-            self.logger.info(f"Error extracting text from PDF {pdf_path}: {str(e)}")
+            self.logger.error(f"Error extracting text from PDF {pdf_path}: {str(e)}")
             return ""
+
+    def get_document_rank_score(self, doc: Dict) -> float:
+        """Calculate a combined rank score for a document."""
+        if not any(k in doc for k in ['final_rank', 'initial_rank', 'weight']):
+            return 1.0  # Default weight if no rank data found
+
+        # Calculate combined score using available metrics
+        final_rank = doc.get('final_rank', 0.0)
+        initial_rank = doc.get('initial_rank', 1.0)
+        weight = doc.get('weight', 1.0)
+
+        # Get content quality indicators from metadata
+        metadata = doc.get('metadata', {})
+        content_length = metadata.get('content_length', 0)
+        code_blocks = metadata.get('code_blocks', 0)
+        outbound_links = metadata.get('outbound_links', 0)
+
+        # Normalize content length (assuming average length of 5000)
+        normalized_length = min(content_length / 5000, 1.0) if content_length else 0.5
+
+        # Calculate content quality score
+        content_score = (
+                normalized_length * 0.4 +
+                min(code_blocks / 10, 1.0) * 0.3 +
+                min(outbound_links / 20, 1.0) * 0.3
+        )
+
+        # Combine different ranking factors
+        combined_score = (
+                final_rank * 0.4 +
+                initial_rank * 0.2 +
+                weight * 0.2 +
+                content_score * 0.2
+        )
+
+        return max(combined_score, 0.1)
+
+    def get_page_info(self, filepath: str) -> Optional[Dict]:
+        """Get URL and rank information for a given filepath."""
+        # Convert to absolute path
+        abs_filepath = os.path.abspath(filepath)
+
+        # Try different path formats
+        paths_to_try = [
+            abs_filepath,  # Absolute path
+            abs_filepath.replace('\\', '/'),  # Normalized absolute path
+            os.path.relpath(abs_filepath, self.docs_dir),  # Relative path from docs_dir
+            os.path.basename(abs_filepath)  # Just filename
+        ]
+
+        for path in paths_to_try:
+            if path in self.page_data:
+                return self.page_data[path]
+
+        return None
 
     def process_file(self, filepath: str) -> Optional[Dict]:
         """Process a single file and return its content and metadata."""
         try:
-            relative_path = os.path.relpath(filepath, self.docs_dir)
-            filename = os.path.basename(filepath)
+            # Convert to absolute path
+            abs_filepath = os.path.abspath(filepath)
+            filename = os.path.basename(abs_filepath)
+            rel_filepath = os.path.relpath(abs_filepath, self.docs_dir)
 
             # Get page information including URL and rank data
-            page_info = self.get_page_info(filepath)
+            page_info = self.get_page_info(abs_filepath)
             url = page_info['url'] if page_info else None
 
-            if filepath.lower().endswith('.pdf'):
-                text_content = self.extract_text_from_pdf(filepath)
-            elif filepath.lower().endswith('.html'):
-                with open(filepath, 'r', encoding='utf-8') as f:
+            if abs_filepath.lower().endswith('.pdf'):
+                text_content = self.extract_text_from_pdf(abs_filepath)
+            elif abs_filepath.lower().endswith('.html'):
+                with open(abs_filepath, 'r', encoding='utf-8') as f:
                     html_content = f.read()
                 text_content = self.extract_text_from_html(html_content)
             else:
@@ -197,13 +219,13 @@ class BuildTextIndex:
             if text_content:
                 doc = {
                     'content': text_content,
-                    'filepath': relative_path,
+                    'filepath': abs_filepath,  # Store absolute filepath
+                    'relative_filepath': rel_filepath,  # Store relative filepath
                     'filename': filename,
                     'url': url,
-                    'type': 'pdf' if filepath.lower().endswith('.pdf') else 'html'
+                    'type': 'pdf' if abs_filepath.lower().endswith('.pdf') else 'html'
                 }
 
-                # Add rank information if available
                 if page_info:
                     doc.update({
                         'final_rank': page_info['final_rank'],
@@ -231,6 +253,7 @@ class BuildTextIndex:
                         self.documents.append(doc)
 
         self.logger.info(f"Loaded {len(self.documents)} documents")
+
     def build_index(self):
         """Build the search index from documents."""
         try:
@@ -245,10 +268,11 @@ class BuildTextIndex:
             # Get list of documents
             documents = []
 
-            # Look for both HTML and PDF files
+            # Look for both HTML and PDF files using absolute paths
+            docs_path = Path(self.docs_dir).resolve()
             supported_files = []
             for extension in ['.html', '.pdf']:
-                supported_files.extend(list(Path(self.docs_dir).rglob(f'*{extension}')))
+                supported_files.extend([str(f.absolute()) for f in docs_path.rglob(f'*{extension}')])
 
             self.total_files = len(supported_files)
 
@@ -267,7 +291,7 @@ class BuildTextIndex:
 
             for i, file_path in enumerate(supported_files):
                 try:
-                    doc = self.process_file(str(file_path))
+                    doc = self.process_file(file_path)
                     if doc and doc['content'].strip():
                         # Add rank score to document
                         doc['rank_score'] = self.get_document_rank_score(doc)
@@ -288,19 +312,15 @@ class BuildTextIndex:
             if not documents:
                 raise ValueError("No valid documents were processed. All files were either empty or failed to process.")
 
-            # Process documents and build BM25 index
             self.documents = documents
             self.tokenized_docs = [self.tokenize(doc['content']) for doc in documents]
 
-            # Validate tokenized documents
             if not all(self.tokenized_docs):
                 raise ValueError("Some documents contained no valid tokens after processing")
 
             doc_weights = [doc.get('rank_score', 1.0) for doc in documents]
-            # self.bm25 = BM25Okapi(corpus=self.tokenized_docs) // not weighted
             self.bm25 = BM25OkapiWeighted(corpus=self.tokenized_docs, doc_weights=doc_weights)
 
-            # Update completion status
             self.completion_time = datetime.now()
             self.status = 'completed'
             self.is_completed = True
@@ -349,7 +369,6 @@ class BuildTextIndex:
             raise ValueError(error_msg)
 
         try:
-            # Update status to saving
             self.status = 'saving'
             self.message = 'Saving index to file...'
 
@@ -369,13 +388,13 @@ class BuildTextIndex:
                 'bm25': self.bm25
             }
 
-            # Save the index
             with open(self.index_path, 'wb') as f:
                 pickle.dump(data, f)
 
             self.status = 'completed'
             self.message = 'Index saved successfully'
             self.is_completed = True
+
             self.completion_time = datetime.now()
 
             self.db.update_text_index(
@@ -398,6 +417,7 @@ class BuildTextIndex:
                 text_index=self
             )
             raise
+
 
     def load_index(self):
         """Load an existing index if available."""
@@ -429,15 +449,17 @@ class BuildTextIndex:
 
 
 def main():
-    docs_dir = "../scraped_data/4959bee9-842e-4d9b-b9f7-552dfe9fcb9a"  # Your documents directory
-    task_id = docs_dir.split("/")[-1]
+    # Use absolute path for docs directory
+    base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    docs_dir = os.path.join(base_dir, "scraped_data", "3e539be0-2a7f-4798-9fca-97dd32a68e42")
+    task_id = os.path.basename(docs_dir)
 
-    # Initialize searcher
+    # Initialize searcher with absolute path
     buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id)
 
     # Check if saved index exists
     if os.path.exists(buildTextIndex.index_path):
-        print("Found existing index file.")
+        print(f"Found existing index file at {buildTextIndex.index_path}")
         try:
             buildTextIndex.load_index()
         except Exception as e:
@@ -447,7 +469,7 @@ def main():
             buildTextIndex.build_index()
             buildTextIndex.save_index()
     else:
-        print("No existing index found. Building new index...")
+        print(f"No existing index found at {buildTextIndex.index_path}. Building new index...")
         buildTextIndex.load_documents()
         buildTextIndex.build_index()
         buildTextIndex.save_index()

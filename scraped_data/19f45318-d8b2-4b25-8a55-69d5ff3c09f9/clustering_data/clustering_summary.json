@@ -1,0 +1,12 @@
+{
+  "total_documents": 99,
+  "num_clusters": 5,
+  "documents_per_cluster": {
+    "0": 25,
+    "1": 24,
+    "3": 20,
+    "2": 19,
+    "4": 11
+  },
+  "timestamp": "2024-11-14T00:07:42.904563"
+}

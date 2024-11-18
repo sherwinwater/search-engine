@@ -70,7 +70,7 @@ def setup_logging(name: Optional[str] = None, task_id: Optional[str] = None) -> 
         # Console Handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s.%(msecs)03dZ | %(levelname)s | [%(process)d-%(processName)s] | [%(threadName)s] | %(name)s: %(message)s')
         console_handler.setFormatter(formatter)
 
         # Add filter to handlers
