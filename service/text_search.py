@@ -23,7 +23,6 @@ class TextSearch:
         self.bm25 = None
         self.documents = None
         self.tokenized_docs = None
-        self.stop_words = set(open('stopwords.txt').read().splitlines())
         self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
         self.doc_ids = []
         self.min_similarity = min_similarity
@@ -33,7 +32,7 @@ class TextSearch:
         self._load_index()
         # Build vocabulary for fuzzy matching
         self._build_vocabulary()
-
+        
     def _load_index(self) -> None:
         """Load the pre-built BM25 index and associated data"""
         try:
@@ -42,15 +41,16 @@ class TextSearch:
                 self.bm25 = index_data.get('bm25')
                 self.documents = index_data.get('documents')
                 self.tokenized_docs = index_data.get('tokenized_docs')
+                self.stop_words = index_data.get('stop_words', set())
 
             if not all([self.bm25, self.documents, self.tokenized_docs]):
-                raise ValueError('Index file is missing required components')
+                raise ValueError("Index file is missing required components")
 
             # Generate document IDs if they don't exist
             self._ensure_document_ids()
 
         except Exception as e:
-            logging.error(f'Error loading index from {self.index_path}: {str(e)}')
+            logging.error(f"Error loading index from {self.index_path}: {str(e)}")
             raise
 
     def _build_vocabulary(self) -> None:
@@ -242,6 +242,37 @@ class TextSearch:
 
         return sorted(results, key=lambda x: x['semantic_score'], reverse=True)
 
+    def get_document_by_id(self, doc_id: str) -> Dict:
+        """
+        Retrieve a specific document by its ID
+
+        Args:
+            doc_id (str): Document ID to retrieve
+
+        Returns:
+            Dict: Document content and metadata
+        """
+        try:
+            idx = self.doc_ids.index(doc_id)
+            return self.documents[idx]
+        except ValueError:
+            return None
+
+    def get_index_stats(self) -> Dict:
+        """
+        Get statistics about the loaded index
+
+        Returns:
+            Dict: Index statistics
+        """
+        return {
+            'num_documents': len(self.documents),
+            'index_path': self.index_path,
+            'vocabulary_size': len(self.vocabulary),
+            'average_document_length': float(np.mean([len(doc) for doc in self.tokenized_docs])),
+            'has_metadata': all('metadata' in doc for doc in self.documents),
+            'fuzzy_similarity_threshold': self.min_similarity
+        }
 
     def get_word_suggestions(self, word: str, num_suggestions: int = 3, min_word_length: int = 3) -> List[Dict[str, Union[str, float]]]:
         """
@@ -469,9 +500,8 @@ class TextSearch:
         }
 
 if __name__ == "__main__":
-    index_path = '../index_data/5ca59887-5717-4cab-bc0e-0f98bfb5964e.pkl'
-    query = 'physvics H?andvles the pvhysic sivmulation'
-    # query = 'physics Handles the physics simulation'
+    index_path = '../index_data/72127052-a40c-4822-924e-bcff99071832.pkl'
+    query = 'storm'
     # query = 'the the the a so'
 
     # Initialize the search
