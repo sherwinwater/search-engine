@@ -715,14 +715,8 @@ def search_url():
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             index_path = os.path.join(parent_dir, 'index_data', f"{task_id}.pkl")
             searcher = TextSearch(index_path=index_path)
-            results = searcher.search(search_query, top_k=5)
-
-            return jsonify({
-                "task_id": task_id,
-                "url": url,
-                "query": search_query,
-                "results": convert_numpy_types(results)
-            }), 200
+            results = searcher.search_with_suggestions(search_query)
+            return jsonify(convert_numpy_types(results))
 
         finally:
             db.close()
