@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -470,12 +471,14 @@ def build_index_by_url():
                 os.makedirs(abs_destination_path, exist_ok=True)
 
                 # Start background processing
-                thread = threading.Thread(
-                    target=thread_manager.process_url_pipeline,
-                    args=(url, abs_destination_path, task_id, max_pages)
-                )
-                thread.daemon = True
-                thread.start()
+                # thread = threading.Thread(
+                #     target=thread_manager.process_url_pipeline,
+                #     args=(url, abs_destination_path, task_id, max_pages)
+                # )
+                # thread.daemon = True
+                # thread.start()
+
+                thread_manager.start_pipeline(url, abs_destination_path, task_id, max_pages)
 
             # Return immediately with status
             return jsonify({
@@ -496,29 +499,43 @@ def build_index_by_url():
 @app.route('/api/kill/<task_id>', methods=['POST'])
 def kill_process(task_id: str):
     try:
-        # Kill the thread
-        if thread_manager.kill_thread(task_id):
-            # Start cleanup using ThreadManager
-            thread_manager.start_cleanup(task_id)
+        if not task_id:
+            return jsonify({"error": "Task ID is required"}), 400
 
-            return jsonify({
-                "success": True,
-                "message": "Process killed and cleanup initiated",
-                "task_id": task_id
-            })
+        def cleanup_sequence(task_id: str):
+            try:
+                # Start cancellation
+                cancellation_success = thread_manager.start_cancellation(task_id)
+
+                if not cancellation_success:
+                    logger.warning(f"No active processing found for task {task_id}")
+                    return
+
+                # Wait for 10 seconds
+                time.sleep(10)
+
+                # Start cleanup process
+                thread_manager.start_cleanup(task_id)
+
+            except Exception as e:
+                logger.error(f"Error in cleanup sequence for {task_id}: {str(e)}")
+
+        # Start the cleanup sequence in a separate thread
+        cleanup_thread = threading.Thread(
+            target=cleanup_sequence,
+            args=(task_id,)
+        )
+        cleanup_thread.start()
 
         return jsonify({
-            "error": "Process not found or already completed",
-            "task_id": task_id
-        }), 404
+            "task_id": task_id,
+            "status": "cancelling",
+            "message": "Cancellation and cleanup sequence initiated"
+        })
 
     except Exception as e:
-        logger.error(f"Error killing process: {str(e)}")
-        return jsonify({
-            "error": "Internal server error",
-            "details": str(e),
-            "task_id": task_id
-        }), 500
+        logger.error(f"Error initiating cancellation and cleanup: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 @app.route('/api/search_url', methods=['POST'])

@@ -72,7 +72,7 @@ class CleanData:
             return False
 
     def cleanup_all_data(self) -> bool:
-        self.logger.info(f"Starting cleanup of all data for task {self.task_id}")
+        self.logger.info(f"===Starting cleanup of all data for task {self.task_id}===")
         success = True
 
         try:
