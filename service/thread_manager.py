@@ -229,6 +229,33 @@ class ThreadManager:
         self.register_thread(f"{task_id}_cleanup", thread)
         thread.start()
 
+    def _force_terminate_thread(self, thread: Thread) -> None:
+        """Force terminate a thread using system-level calls"""
+        if not thread.is_alive():
+            return
+
+        # Get the thread ID
+        if hasattr(thread, "_thread_id"):
+            thread_id = thread._thread_id
+        else:
+            for tid, tobj in threading._active.items():
+                if tobj is thread:
+                    thread_id = tid
+                    break
+
+        # Raise SystemExit exception in the thread
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+            ctypes.c_long(thread_id),
+            ctypes.py_object(SystemExit)
+        )
+
+        if res > 1:
+            # If more than one thread was affected, revert the effect
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                ctypes.c_long(thread_id),
+                None
+            )
+
     def _terminate_thread_impl(self, task_id: str, thread: Thread) -> bool:
         """Internal implementation of thread termination logic"""
         if not thread or not thread.is_alive():
