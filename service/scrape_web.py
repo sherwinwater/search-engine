@@ -311,132 +311,6 @@ class HTMLScraper:
         self.logger.info(f"Found {len(links)} valid links on page {current_url}")
         return links
 
-    # def analyze_page(self, url):
-    #     """Analyze a single page and collect graph data."""
-    #     self.logger.info(f"Starting analysis of page: {url}")
-    #
-    #     if url in self.visited_urls:
-    #         self.logger.debug(f"Skipping already visited URL: {url}")
-    #         return set()
-    #
-    #     self.visited_urls.add(url)
-    #     url_id = self.get_url_id(url)
-    #     absolute_path, file_name = self.get_absolute_path(url)  # Calculate relative path during analysis
-    #
-    #     try:
-    #         start_time = time.time()
-    #         self.logger.debug(f"Sending HEAD request to: {url}")
-    #         head_response = self.session.head(url, timeout=5)
-    #         content_type = head_response.headers.get('Content-Type', '').lower()
-    #
-    #         if 'text/html' not in content_type:
-    #             self.logger.debug(f"Skipping non-HTML content type: {content_type} for {url}")
-    #             return set()
-    #
-    #         self.logger.debug(f"Sending GET request to: {url}")
-    #         response = self.session.get(url, timeout=10)
-    #         response.raise_for_status()
-    #
-    #         request_time = time.time() - start_time
-    #         page_size = len(response.content) / 1024
-    #
-    #         self.logger.info(f"Successfully analyzed {url} - Size: {page_size:.2f}KB, Time: {request_time:.2f}s")
-    #
-    #         self.request_times.append(request_time)
-    #         self.page_sizes.append(page_size)
-    #
-    #         soup = BeautifulSoup(response.text, 'html.parser')
-    #         title = self.extract_page_title(soup) or url
-    #         labels = url.split('/')
-    #         label = next((label for label in reversed(labels) if label), 'undefined')
-    #
-    #         # Calculate page weight and metadata
-    #         page_weight = self.calculate_content_weight(soup, url)
-    #         node_metadata = {
-    #             'content_length': len(soup.get_text()),
-    #             'headers_count': len(soup.find_all(['h1', 'h2', 'h3'])),
-    #             'code_blocks': len(soup.find_all(['code', 'pre'])),
-    #             'outbound_links': 0,
-    #             'http_status': response.status_code,
-    #             'content_type': content_type,
-    #             'last_updated': time.time()
-    #         }
-    #
-    #         node = {
-    #             'id': url_id,
-    #             'url': url,
-    #             'title': title,
-    #             'filename': file_name,
-    #             'path': absolute_path,
-    #             'label': label,
-    #             'size': page_size,
-    #             'weight': page_weight,
-    #             'initial_rank': 1.0,
-    #             'final_rank': None,
-    #             'metadata': node_metadata
-    #         }
-    #
-    #         # Store file path mapping
-    #         self.file_paths[url] = absolute_path
-    #
-    #         if node not in self.graph_data['nodes']:
-    #             self.graph_data['nodes'].append(node)
-    #
-    #         # Update analysis metrics
-    #         self.update_status(
-    #             analysis={
-    #                 'pages_found': len(self.visited_urls),
-    #                 'average_page_size': round(mean(self.page_sizes), 2),
-    #                 'total_size_kb': round(sum(self.page_sizes), 2)
-    #             }
-    #         )
-    #
-    #         links = self.extract_links(soup, response.url)
-    #         # Add edges to graph data with weights
-    #         for link in links:
-    #             if link not in self.url_to_id:
-    #                 link_id = self.get_url_id(link)
-    #             else:
-    #                 link_id = self.url_to_id[link]
-    #
-    #             # Find the link element to calculate weight
-    #             link_element = soup.find('a', href=lambda x: x and (link in x or link.endswith(x.lstrip('/'))))
-    #             if link_element:
-    #                 link_weight = self.calculate_link_weight(url, link, link_element)
-    #             else:
-    #                 link_weight = 1.0  # Default weight if link element not found
-    #
-    #             edge = {
-    #                 'source': url_id,
-    #                 'target': link_id,
-    #                 'weight': link_weight,
-    #                 'metadata': {
-    #                     'link_text': link_element.get_text().strip() if link_element else '',
-    #                     'link_class': link_element.get('class', []) if link_element else [],
-    #                     'link_position': link_element.parent.name if link_element and link_element.parent else None
-    #                 }
-    #             }
-    #
-    #             if edge not in self.graph_data['links']:
-    #                 self.graph_data['links'].append(edge)
-    #                 node_metadata['outbound_links'] += 1  # Update outbound links count
-    #
-    #         self.logger.info(f"Found {len(links)} new links on page {url}")
-    #         return links
-    #
-    #     except requests.exceptions.HTTPError as e:
-    #         self.logger.error(f"HTTP Error analyzing {url}: {str(e)}")
-    #         self.visited_urls.remove(url)
-    #         if url in self.url_to_id:
-    #             del self.url_to_id[url]
-    #         return set()
-    #     except Exception as e:
-    #         self.logger.error(f"Error analyzing {url}: {str(e)}")
-    #         self.visited_urls.remove(url)
-    #         if url in self.url_to_id:
-    #             del self.url_to_id[url]
-    #         return set()
-
     def analyze_site(self, max_workers=5):
         """
         Analyze the site structure and create graph data.
@@ -444,7 +318,7 @@ class HTMLScraper:
         Args:
             max_workers (int): Maximum number of concurrent workers
         """
-        self.logger.info(f"Starting site analysis with {max_workers} workers and {self.max_pages} page limit")
+        self.logger.info(f"=== Starting site analysis with {max_workers} workers and {self.max_pages} page limit ===")
         self.status['analysis']['start_time'] = time.time()
         self.update_status('analyzing', 'Analyzing site structure...')
 
@@ -706,6 +580,7 @@ class HTMLScraper:
             self.update_status('failed', error_msg)
             return {"error": error_msg}, 400
 
+        self.logger.info("=== Starting page download ===")
         total_urls = len(self.visited_urls)
         current_time = time.time()
 
@@ -755,6 +630,7 @@ class HTMLScraper:
             )
 
             self.update_status('completed', completion_message)
+            self.logger.info("=== Download Completed ===")
 
             return {
                 "total_urls": total_urls,

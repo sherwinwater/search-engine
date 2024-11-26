@@ -243,12 +243,13 @@ class BuildTextIndex:
 
     def load_documents(self):
         """Load and process all supported documents."""
-        self.logger.info("Loading and processing documents...")
+        self.logger.info("=== Indexing ====")
         for root, _, files in os.walk(self.docs_dir):
             for file in tqdm(files):
                 if file.lower().endswith(('.html', '.pdf')):
                     filepath = os.path.join(root, file)
                     doc = self.process_file(filepath)
+                    self.logger.info(f"Loading document:{filepath}")
                     if doc:
                         self.documents.append(doc)
 
@@ -257,6 +258,7 @@ class BuildTextIndex:
     def build_index(self):
         """Build the search index from documents."""
         try:
+            self.logger.info("Starting to build the search index")
             self.status = 'building'
             self.message = 'Starting index building process'
 
@@ -264,19 +266,23 @@ class BuildTextIndex:
                 task_id=self.task_id,
                 text_index=self
             )
+            self.logger.info(f"Updated database with task_id: {self.task_id}")
 
             # Get list of documents
             documents = []
 
             # Look for both HTML and PDF files using absolute paths
             docs_path = Path(self.docs_dir).resolve()
+            self.logger.info(f"Searching for documents in: {docs_path}")
             supported_files = []
             for extension in ['.html', '.pdf']:
                 supported_files.extend([str(f.absolute()) for f in docs_path.rglob(f'*{extension}')])
 
             self.total_files = len(supported_files)
+            self.logger.info(f"Found {self.total_files} supported files")
 
             if self.total_files == 0:
+                self.logger.warning(f"No HTML or PDF files found in directory: {self.docs_dir}")
                 self.status = 'no files found'
                 self.db.update_text_index(
                     task_id=self.task_id,
@@ -291,11 +297,15 @@ class BuildTextIndex:
 
             for i, file_path in enumerate(supported_files):
                 try:
+                    self.logger.info(f"Processing file {i + 1}/{self.total_files}: {file_path}")
                     doc = self.process_file(file_path)
                     if doc and doc['content'].strip():
                         # Add rank score to document
                         doc['rank_score'] = self.get_document_rank_score(doc)
                         documents.append(doc)
+                        self.logger.info(f"Successfully processed and added document: {file_path}")
+                    else:
+                        self.logger.warning(f"Skipped empty or invalid document: {file_path}")
                     self.processed_files = i + 1
                     self.progress_percentage = (i + 1) / self.total_files * 100
 
@@ -310,14 +320,20 @@ class BuildTextIndex:
                     )
 
             if not documents:
+                self.logger.error("No valid documents were processed. All files were either empty or failed to process.")
                 raise ValueError("No valid documents were processed. All files were either empty or failed to process.")
 
             self.documents = documents
+            self.logger.info(f"Successfully processed {len(documents)} documents")
+
+            self.logger.info("Tokenizing documents")
             self.tokenized_docs = [self.tokenize(doc['content']) for doc in documents]
 
             if not all(self.tokenized_docs):
+                self.logger.error("Some documents contained no valid tokens after processing")
                 raise ValueError("Some documents contained no valid tokens after processing")
 
+            self.logger.info("Building BM25 index")
             doc_weights = [doc.get('rank_score', 1.0) for doc in documents]
             self.bm25 = BM25OkapiWeighted(corpus=self.tokenized_docs, doc_weights=doc_weights)
 
@@ -330,11 +346,14 @@ class BuildTextIndex:
             self.message = f'Index built successfully. Processed {len(documents)} out of {self.total_files} files.'
             self.progress_percentage = 100
 
+            self.logger.info(self.message)
+
             self.db.update_text_index(
                 task_id=self.task_id,
                 text_index=self
             )
 
+            self.logger.info("Index building process completed successfully")
             return True
 
         except Exception as e:
@@ -350,7 +369,6 @@ class BuildTextIndex:
                 text_index=self
             )
             raise
-
     def save_index(self):
         """Save the search index and processed documents to a file."""
         if not self.bm25:
@@ -402,7 +420,7 @@ class BuildTextIndex:
                 text_index=self
             )
 
-            self.logger.info("Index saved successfully")
+            self.logger.info("=== Index saved successfully ===")
 
         except Exception as e:
             error_msg = f"Error saving index: {str(e)}"

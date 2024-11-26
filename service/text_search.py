@@ -9,7 +9,7 @@ from collections import defaultdict
 
 
 class TextSearch:
-    def __init__(self, index_path: str, top_k: int = 10, min_similarity: float = 80):
+    def __init__(self, index_path: str, top_k: int = 5, min_similarity: float = 80):
         """
         Initialize BM25 search with a pre-built index
 
