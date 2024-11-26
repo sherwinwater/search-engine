@@ -1,6 +1,6 @@
 import argparse
 import json
-import shutil
+import time
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -11,13 +11,11 @@ import validators
 from flask_socketio import SocketIO, join_room, leave_room
 from threading import Lock
 from urllib.parse import urlparse
-import time
+from datetime import datetime
 
 from db.database import SearchEngineDatabase
-from service.build_text_index import BuildTextIndex
-from service.document_clustering import DocumentClustering
-from service.scrape_web import HTMLScraper
 from service.text_search import TextSearch
+from service.thread_manager import ThreadManager
 from utils.convert_numpy_types import convert_numpy_types
 from utils.json_serialize import prepare_scraper_status_for_json
 from utils.setup_logging import setup_logging, SocketIOLogHandler
@@ -52,6 +50,8 @@ socketio = SocketIO(
 log_lock = Lock()
 socket_handler = SocketIOLogHandler.init_handler(socketio)
 logger = setup_logging(__name__)
+
+thread_manager = ThreadManager()
 
 active_connections = {}
 
@@ -102,103 +102,6 @@ def home():
     return jsonify(data)
 
 
-def delete_files_except(base_path, exceptions, task_id):
-    """
-    Delete all files and folders in the given path except those specified in exceptions.
-
-    Args:
-        base_path (str): Path to the directory where deletion will occur
-        exceptions (list): List of file/folder names to preserve
-    """
-    # Ensure the path exists
-    logger = setup_logging(name=f"{__name__}", task_id=task_id)
-
-    if not os.path.exists(base_path):
-        logger.info(f"Path {base_path} does not exist")
-        return
-
-    # List all items in the directory
-    items = os.listdir(base_path)
-
-    # Delete each item unless it's in exceptions
-    for item in items:
-        item_path = os.path.join(base_path, item)
-
-        # Skip if item is in exceptions
-        if item in exceptions:
-            logger.info(f"Preserving: {item}")
-            continue
-
-        try:
-            if os.path.isfile(item_path):
-                os.remove(item_path)
-                logger.info(f"Deleted file: {item}")
-            elif os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-                logger.info(f"Deleted directory: {item}")
-        except Exception as e:
-            logger.exception(f"Error deleting {item}: {str(e)}")
-
-
-def background_scraping(url, output_dir, task_id, max_workers=10, max_pages=50):
-    """Background task for site analysis and downloading."""
-    try:
-        db = SearchEngineDatabase()
-        scraper = HTMLScraper(base_url=url, output_dir=output_dir, task_id=task_id, max_pages=max_pages)
-        db.update_scraping_task(task_id, scraper)
-
-        if scraper.analyze_site(max_workers=max_workers):
-            scraper.download_all(max_workers=max_workers)
-    except Exception as e:
-        scraper.update_status('failed', f'Error during scraping: {str(e)}')
-    finally:
-        db.close()
-
-
-def background_building_index(docs_dir: str, task_id: str, url: str):
-    """Background task for site analysis and downloading."""
-    try:
-        buildTextIndex = BuildTextIndex(docs_dir=docs_dir, task_id=task_id, scraping_url=url)
-
-        buildTextIndex.load_documents()
-        buildTextIndex.build_index()
-        buildTextIndex.save_index()
-
-    except Exception as e:
-        logger.exception(e)
-
-
-def background_clustering(docs_dir, task_id, url):
-    """Background task for building clusters"""
-    try:
-        db = SearchEngineDatabase()
-        try:
-            # Update status to processing
-            db.update_clustering_status(task_id, 'processing')
-
-            # Set up paths
-            webpage_graph = os.path.join(docs_dir, 'webpage_graph.json')
-
-            # Initialize and run clustering
-            cluster = DocumentClustering(task_id, docs_dir, webpage_graph)
-            cluster.build_clustering_data()
-
-            # Update status to completed
-            db.update_clustering_status(task_id, 'completed')
-
-            exceptions = ['webpage_graph.json', 'clustering_data']
-            # delete_files_except(docs_dir, exceptions, task_id)
-
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Error in clustering for task {task_id}: {error_msg}")
-            db.update_clustering_status(task_id, 'failed', error_msg)
-        finally:
-            db.close()
-    except Exception as e:
-        logger.error(f"Critical error in clustering thread: {str(e)}")
-
-
 @app.route('/api/scrape_web', methods=['GET'])
 def scrape_web():
     """Start web scraping task."""
@@ -236,7 +139,7 @@ def scrape_web():
 
     # Start background thread
     thread = threading.Thread(
-        target=background_scraping,
+        target=thread_manager.start_background_scraping,
         args=(url, destination_path, task_id, max_workers)
     )
     thread.daemon = True
@@ -290,7 +193,7 @@ def build_text_index(task_id):
 
         # Start background thread
         thread = threading.Thread(
-            target=background_building_index,
+            target=thread_manager.start_background_building_text_index,
             args=(docs_dir, task_id, url)
         )
         thread.daemon = True
@@ -332,7 +235,7 @@ def build_text_index_with_local_data():
 
         # Start background thread
         thread = threading.Thread(
-            target=background_building_index,
+            target=thread_manager.start_background_building_text_index,
             args=(docs_dir, task_id)
         )
         thread.daemon = True
@@ -370,38 +273,54 @@ def get_build_text_index_status(task_id):
 
 @app.route('/api/clustering_status/<task_id>', methods=['GET'])
 def get_clustering_status(task_id):
-    """Get the status of a scraping task."""
     db = SearchEngineDatabase()
     try:
+        status_info = {
+            "task_id": task_id,
+            "scraping_url": "",
+            "processed_files": "",
+            "created_at": ""
+        }
+
         index_status = db.get_building_text_index_status(task_id)
         if not index_status:
-            # Check if task exists but status not yet set
             task_exists = db.get_web_scraping_status(task_id)
-            if task_exists:
-                return jsonify({
-                    "status": "pending",
-                    "message": "Task initialized, waiting for status update"
-                }), 202
-            return jsonify({
-                "error": "Task not found"
-            }), 404
+            if not task_exists:
+                return jsonify({"error": "Task not found"}), 404
+
+            status_info['scraping_url'] = task_exists.get('scraping_url')
+            status_info['processed_files'] = task_exists.get('processed_files')
+            status_info['created_at'] = datetime.fromtimestamp(task_exists.get('start_time'))
+
+            if task_exists.get('status') != 'completed':
+                status_info["status"] = "downloading"
+            else:
+                status_info["status"] = "indexing"
+
+            return jsonify(status_info)
+
+        status_info["status"] = "indexing"
+        status_info['scraping_url'] = index_status.get('scraping_url')
+        status_info['created_at'] = index_status.get('created_at')
+
+        processed_files = index_status.get('processed_files')
+        if processed_files == 0:
+            scraping_data = db.get_web_scraping_status(task_id)
+            processed_files = scraping_data.get('processed_files')
+
+        status_info['processed_files'] = processed_files
+
+        if index_status.get('status') != 'completed':
+            return jsonify(status_info)
 
         clustering_status = db.get_clustering_status(task_id)
+        status_info["status"] = "completed" if clustering_status and clustering_status.get('status') == 'completed' else "clustering"
 
-        if clustering_status and clustering_status.get('status') == 'completed':
-            return jsonify(index_status)
-
-        return jsonify({
-            "status": 'clustering'
-        })
+        return jsonify(status_info)
 
     except Exception as e:
-        logger.error(f"Clustering status error for task {task_id}: {str(e)}", exc_info=True)
-        return jsonify({
-            "status": "error",
-            "message": "Internal server error",
-            "error": str(e)
-        }), 500
+        logger.error(f"Clustering status error for task {task_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
     finally:
         db.close()
 
@@ -530,144 +449,93 @@ def search_text(task_id):
 
 @app.route('/api/build_index_by_url', methods=['POST'])
 def build_index_by_url():
-    """
-    Combined endpoint to scrape URL, build index, and cluster content.
-    Required parameters: url
-    """
     try:
-        # Get URL from request
         data = request.get_json()
         url = data.get('url')
-        max_pages = data.get('max_pages', 50)
+        max_pages = data.get('max_pages', 40)
 
-        if not url:
-            return jsonify({
-                "error": "'url' is required"
-            }), 400
+        if not url or not validators.url(url):
+            return jsonify({"error": "Invalid or missing URL"}), 400
 
-        # Validate URL format
-        if not validators.url(url):
-            return jsonify({
-                "error": f"Invalid URL format: {url}"
-            }), 400
-
-        # Extract domain from URL
-        domain = urlparse(url).netloc
-
-        # Initialize database connection
         db = SearchEngineDatabase()
         try:
-            # Check if domain has been scraped before
+            # Check existing tasks
             existing_tasks = db.get_web_scraping_data_by_url(url)
-            task_id = None
-
             if existing_tasks:
-                # Use existing scrape data
                 task_id = existing_tasks['task_id']
-                logger.info(f"Using existing scrape data for domain {domain} with task_id: {task_id}")
             else:
-                # Start new scraping task
+                # Initialize new task
                 task_id = str(uuid.uuid4())
                 current_dir = os.path.dirname(os.path.abspath(__file__))
-                root_dir = os.path.dirname(current_dir)
-                abs_destination_path = os.path.join(root_dir, 'scraped_data', task_id)
-
+                abs_destination_path = os.path.join(current_dir, '..', 'scraped_data', task_id)
                 os.makedirs(abs_destination_path, exist_ok=True)
 
-                # Start scraping in background
-                thread = threading.Thread(
-                    target=background_scraping,
-                    args=(url, abs_destination_path, task_id, 10, max_pages)
-                )
-                thread.daemon = True
-                thread.start()
+                # Start background processing
+                # thread = threading.Thread(
+                #     target=thread_manager.process_url_pipeline,
+                #     args=(url, abs_destination_path, task_id, max_pages)
+                # )
+                # thread.daemon = True
+                # thread.start()
 
-                # Wait for scraping to complete
-                max_wait_time = 300  # 5 minutes timeout
-                start_time = time.time()
+                thread_manager.start_pipeline(url, abs_destination_path, task_id, max_pages)
 
-                while True:
-                    scraper = db.get_web_scraping_status(task_id)
-                    if scraper:
-                        if scraper.get('status') == 'completed':
-                            break
-                        elif scraper.get('status') == 'failed':
-                            return jsonify({"error": "Scraping failed", "details": scraper.get('error')}), 500
-
-                    if time.time() - start_time > max_wait_time:
-                        return jsonify({"error": "Scraping timeout"}), 504
-
-                    time.sleep(2)
-
-            # Get scraper status to get docs_dir
-            scraper = db.get_web_scraping_status(task_id)
-            docs_dir = scraper.get('output_dir')
-
-            # Check and start index building if needed
-            index_status = db.get_building_text_index_status(task_id)
-            if not index_status or index_status.get('status') != 'completed':
-                # Start building index
-                thread = threading.Thread(
-                    target=background_building_index,
-                    args=(docs_dir, task_id, url)
-                )
-                thread.daemon = True
-                thread.start()
-
-                # Wait for indexing to complete
-                max_wait_time = 300  # 5 minutes timeout
-                start_time = time.time()
-
-                while True:
-                    index_status = db.get_building_text_index_status(task_id)
-                    if index_status:
-                        if index_status.get('status') == 'completed':
-                            break
-                        elif index_status.get('status') == 'failed':
-                            return jsonify({"error": "Indexing failed", "details": index_status.get('error')}), 500
-
-                    if time.time() - start_time > max_wait_time:
-                        return jsonify({"error": "Indexing timeout"}), 504
-
-                    time.sleep(2)
-
-            # Check and start clustering if needed
-            clustering_status = db.get_clustering_status(task_id)
-            if not clustering_status or clustering_status.get('status') != 'completed':
-                # Start clustering in background
-                thread = threading.Thread(
-                    target=background_clustering,
-                    args=(docs_dir, task_id, url)
-                )
-                thread.daemon = True
-                thread.start()
-
-            # Return response based on overall status
-            clustering_status = db.get_clustering_status(task_id)
-            if clustering_status and clustering_status.get('status') == 'completed':
-                status = 'completed'
-            else:
-                status = 'processing'
-
+            # Return immediately with status
             return jsonify({
                 "task_id": task_id,
                 "url": url,
-                "status": status,
-                "scraping_status": scraper.get('status'),
-                "indexing_status": index_status.get('status') if index_status else 'not_started',
-                "clustering_status": clustering_status.get('status') if clustering_status else 'not_started'
+                "status": "processing",
+                "message": "Processing started"
             })
 
         finally:
             db.close()
 
     except Exception as e:
-        logger.error(f"Error in build_index_by_url endpoint: {str(e)}")
+        logger.error(f"Error initiating processing: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
+@app.route('/api/kill/<task_id>', methods=['POST'])
+def kill_process(task_id: str):
+    try:
+        if not task_id:
+            return jsonify({"error": "Task ID is required"}), 400
+
+        def cleanup_sequence(task_id: str):
+            try:
+                # Start cancellation
+                cancellation_success = thread_manager.start_cancellation(task_id)
+
+                if not cancellation_success:
+                    logger.warning(f"No active processing found for task {task_id}")
+                    return
+
+                # Wait for 10 seconds
+                time.sleep(10)
+
+                # Start cleanup process
+                thread_manager.start_cleanup(task_id)
+
+            except Exception as e:
+                logger.error(f"Error in cleanup sequence for {task_id}: {str(e)}")
+
+        # Start the cleanup sequence in a separate thread
+        cleanup_thread = threading.Thread(
+            target=cleanup_sequence,
+            args=(task_id,)
+        )
+        cleanup_thread.start()
+
         return jsonify({
-            "status": "error",
-            "message": "Internal server error",
-            "error": str(e)
-        }), 500
+            "task_id": task_id,
+            "status": "cancelling",
+            "message": "Cancellation and cleanup sequence initiated"
+        })
+
+    except Exception as e:
+        logger.error(f"Error initiating cancellation and cleanup: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 @app.route('/api/search_url', methods=['POST'])

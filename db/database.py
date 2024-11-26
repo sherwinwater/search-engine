@@ -307,7 +307,9 @@ class SearchEngineDatabase:
                 'webpage_graph_file': task_row[11],
                 'start_time': task_row[12],
                 'is_completed': bool(task_row[13]),
-                'completion_time': task_row[14]
+                'completion_time': task_row[14],
+                'scraping_url': task_row[2],
+                'processed_files':  len(set(json.loads(task_row[4])) if task_row[4] else set()),
             }
 
             # Get analysis data
@@ -727,6 +729,48 @@ class SearchEngineDatabase:
         except Exception as e:
             print(f"Error getting clustering info: {e}")
             raise
+
+    def delete_web_scraping_index_data(self, task_id: str) -> bool:
+        """Delete all data associated with a task from all tables"""
+        try:
+            conn = self.thread_safe_db.get_connection()
+            cursor = self.thread_safe_db.get_cursor()
+
+            # Start transaction
+            cursor.execute('BEGIN TRANSACTION')
+
+            try:
+                # Delete from tasks table
+                cursor.execute('DELETE FROM tasks WHERE task_id = ?', (task_id,))
+
+                # Delete from analysis table
+                cursor.execute('DELETE FROM analysis WHERE task_id = ?', (task_id,))
+
+                # Delete from downloads table
+                cursor.execute('DELETE FROM downloads WHERE task_id = ?', (task_id,))
+
+                # Delete from text_index table
+                cursor.execute('DELETE FROM text_index WHERE task_id = ?', (task_id,))
+
+                # Delete from clustering table
+                cursor.execute('DELETE FROM clustering WHERE task_id = ?', (task_id,))
+
+                # Delete from cluster_details table
+                cursor.execute('DELETE FROM cluster_details WHERE task_id = ?', (task_id,))
+
+                # Commit transaction
+                conn.commit()
+                return True
+
+            except sqlite3.Error as e:
+                # Rollback in case of error
+                conn.rollback()
+                logger.error(f"Failed to delete task data: {e}")
+                return False
+
+        except sqlite3.Error as e:
+            logger.error(f"Database error while deleting task data: {e}")
+            return False
     def close(self):
         """Close all thread-local connections"""
         self.thread_safe_db.close()

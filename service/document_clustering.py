@@ -364,20 +364,35 @@ class DocumentClustering:
 
     def find_optimal_clusters(self, max_clusters=10):
         """Find optimal number of clusters using silhouette score"""
-        if len(self.documents) == 1:
-            return 1  # For a single document, return 1 cluster
+        n_samples = len(self.documents)
+
+        # Handle special cases
+        if n_samples <= 1:
+            return 1
+
+        # Check if documents are too similar
+        variance = np.var(self.tfidf_matrix, axis=0).sum()
+        if variance < 1e-10:  # Threshold for considering documents too similar
+            return 1
 
         best_score = -1
         best_n = 2
 
-        for n in range(2, min(max_clusters + 1, len(self.documents))):
-            kmeans = KMeans(n_clusters=n, random_state=42)
-            labels = kmeans.fit_predict(self.tfidf_matrix)
-            score = silhouette_score(self.tfidf_matrix, labels)
+        max_possible_clusters = min(max_clusters + 1, n_samples)
+        for n in range(2, max_possible_clusters):
+            try:
+                kmeans = KMeans(n_clusters=n, random_state=42)
+                labels = kmeans.fit_predict(self.tfidf_matrix)
 
-            if score > best_score:
-                best_score = score
-                best_n = n
+                # Only calculate score if we have valid clusters
+                if len(set(labels)) > 1:
+                    score = silhouette_score(self.tfidf_matrix, labels)
+                    if score > best_score:
+                        best_score = score
+                        best_n = n
+            except Exception as e:
+                self.logger.warning(f"Error calculating clusters for n={n}: {e}")
+                continue
 
         return best_n
 
@@ -749,7 +764,7 @@ class DocumentClustering:
     def build_clustering_data(self):
         """Build clustering data with progress tracking"""
         try:
-            self.logger.info("Loading documents...")
+            self.logger.info("=== Start clustering documents ===")
             self.load_documents()
 
             self.logger.info("Preprocessing and vectorizing...")
@@ -761,7 +776,7 @@ class DocumentClustering:
             self.logger.info("Saving results...")
             self.save_results()
 
-            self.logger.info("Clustering process completed successfully")
+            self.logger.info("=== Clustering done ===")
         except Exception as e:
             self.logger.info(f"Error in build_clustering_data: {str(e)}")
             raise
