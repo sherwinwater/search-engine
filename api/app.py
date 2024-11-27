@@ -536,6 +536,34 @@ def kill_process(task_id: str):
     except Exception as e:
         logger.error(f"Error initiating cancellation and cleanup: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+@app.route('/api/delete/<task_id>', methods=['POST'])
+def delete_task(task_id: str):
+    try:
+        if not task_id:
+            return jsonify({"error": "Task ID is required"}), 400
+
+        def cleanup_sequence(task_id: str):
+            try:
+                thread_manager.start_cleanup(task_id)
+            except Exception as e:
+                logger.error(f"Error in cleanup sequence for {task_id}: {str(e)}")
+
+        # Start the cleanup sequence in a separate thread
+        cleanup_thread = threading.Thread(
+            target=cleanup_sequence,
+            args=(task_id,)
+        )
+        cleanup_thread.start()
+
+        return jsonify({
+            "task_id": task_id,
+            "status": "deleting",
+            "message": "Deleting all data related to task"
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting task: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 
 @app.route('/api/search_url', methods=['POST'])
