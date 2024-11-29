@@ -374,9 +374,9 @@ def get_build_text_index_by_task_id(task_id):
 def get_text_index_status_by_url():
     """Get the status of a scraping task."""
     data = request.get_json()
-    url = data.get('url')
+    url = data.get('url', '').strip().rstrip('/')
 
-    if not url:
+    if not url or url == '':
         return jsonify({
             "error": "'url' is required"
         }), 400
