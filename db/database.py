@@ -258,14 +258,14 @@ class SearchEngineDatabase:
         try:
             # Get a new connection for this thread if needed
             cursor = self.thread_safe_db.get_cursor()
-            parsed_url = urlparse(url)
-            domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+            # parsed_url = urlparse(url)
+            # domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
             # Get task data
             cursor.execute('''
                 SELECT * FROM tasks 
-                WHERE domain = ? OR ? LIKE '%' || domain || '%'
-            ''', (domain, url))
+                WHERE base_path = ?
+            ''', (url))
 
             task_data = cursor.fetchone()
 

@@ -451,10 +451,10 @@ def search_text(task_id):
 def build_index_by_url():
     try:
         data = request.get_json()
-        url = data.get('url')
+        url = data.get('url', '').strip()
         max_pages = data.get('max_pages', 40)
 
-        if not url or not validators.url(url):
+        if not url or url == '' or not validators.url(url):
             return jsonify({"error": "Invalid or missing URL"}), 400
 
         db = SearchEngineDatabase()
