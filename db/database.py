@@ -265,7 +265,7 @@ class SearchEngineDatabase:
             cursor.execute('''
                 SELECT * FROM tasks 
                 WHERE base_path = ?
-            ''', (url))
+            ''', (url,))
 
             task_data = cursor.fetchone()
 
