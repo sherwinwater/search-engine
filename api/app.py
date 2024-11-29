@@ -374,9 +374,9 @@ def get_build_text_index_by_task_id(task_id):
 def get_text_index_status_by_url():
     """Get the status of a scraping task."""
     data = request.get_json()
-    url = data.get('url')
+    url = data.get('url', '').strip().rstrip('/')
 
-    if not url:
+    if not url or url == '':
         return jsonify({
             "error": "'url' is required"
         }), 400
@@ -467,16 +467,9 @@ def build_index_by_url():
                 # Initialize new task
                 task_id = str(uuid.uuid4())
                 current_dir = os.path.dirname(os.path.abspath(__file__))
-                abs_destination_path = os.path.join(current_dir, '..', 'scraped_data', task_id)
+                root_dir = os.path.dirname(current_dir)
+                abs_destination_path = os.path.join(root_dir, 'scraped_data', task_id)
                 os.makedirs(abs_destination_path, exist_ok=True)
-
-                # Start background processing
-                # thread = threading.Thread(
-                #     target=thread_manager.process_url_pipeline,
-                #     args=(url, abs_destination_path, task_id, max_pages)
-                # )
-                # thread.daemon = True
-                # thread.start()
 
                 thread_manager.start_pipeline(url, abs_destination_path, task_id, max_pages)
 
