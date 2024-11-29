@@ -451,7 +451,7 @@ def search_text(task_id):
 def build_index_by_url():
     try:
         data = request.get_json()
-        url = data.get('url', '').strip()
+        url = data.get('url', '').strip().rstrip('/')
         max_pages = data.get('max_pages', 40)
 
         if not url or url == '' or not validators.url(url):
