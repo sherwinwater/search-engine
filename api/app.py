@@ -25,7 +25,7 @@ app = Flask(__name__)
 CORS(app, resources={
     r"/*": {  # Apply to all routes under /api/
         "origins": "*",  # Allow all origins
-        "methods": ["GET", "POST", "OPTIONS"],  # Allowed methods
+        "methods": ["GET", "POST", "OPTIONS","DELETE","PUT","PATCH"],  # Allowed methods
         "allow_headers": ["Content-Type", "Authorization"],  # Allowed headers
         "supports_credentials": True,  # Allow credentials
         "expose_headers": ["Content-Range", "X-Content-Range"]  # Expose these headers to the frontend
@@ -529,7 +529,7 @@ def kill_process(task_id: str):
     except Exception as e:
         logger.error(f"Error initiating cancellation and cleanup: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-@app.route('/api/delete/<task_id>', methods=['POST'])
+@app.route('/api/text_indexes/<task_id>', methods=['DELETE'])
 def delete_task(task_id: str):
     try:
         if not task_id:
