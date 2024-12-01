@@ -4,8 +4,9 @@ from typing import List, Dict, Union, Tuple
 import numpy as np
 import logging
 import re
-from rapidfuzz import fuzz, process
-from collections import defaultdict
+from rapidfuzz import process, fuzz
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 class TextSearch:
@@ -22,7 +23,7 @@ class TextSearch:
         self.bm25 = None
         self.documents = None
         self.tokenized_docs = None
-        self.stop_words = set()
+        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
         self.doc_ids = []
         self.min_similarity = min_similarity
         self.vocabulary = set()  # For fuzzy matching
@@ -31,7 +32,7 @@ class TextSearch:
         self._load_index()
         # Build vocabulary for fuzzy matching
         self._build_vocabulary()
-
+        
     def _load_index(self) -> None:
         """Load the pre-built BM25 index and associated data"""
         try:
@@ -56,7 +57,7 @@ class TextSearch:
         """Build vocabulary from tokenized documents for fuzzy matching"""
         for doc in self.tokenized_docs:
             self.vocabulary.update(doc)
-        logging.info(f"Built vocabulary with {len(self.vocabulary)} unique terms")
+        logging.info(f'Built vocabulary with {len(self.vocabulary)} unique terms')
 
     def _get_fuzzy_matches(self, query_term: str, max_matches: int = 3) -> List[Tuple[str, float]]:
         """
@@ -98,12 +99,12 @@ class TextSearch:
                 if 'id' not in doc:
                     doc['id'] = f'doc_{idx}'
                 if 'content' not in doc:
-                    logging.warning(f"Document at index {idx} has no content field")
+                    logging.warning(f'Document at index {idx} has no content field')
                     doc['content'] = ''
                 if 'metadata' not in doc:
                     doc['metadata'] = {}
             else:
-                raise ValueError(f"Invalid document format at index {idx}")
+                raise ValueError(f'Invalid document format at index {idx}')
 
         self.doc_ids = [doc['id'] for doc in self.documents]
 
@@ -117,10 +118,8 @@ class TextSearch:
         Returns:
             List[str]: List of tokens
         """
-        text = text.lower()
-        text = re.sub(r'[^\w\s]', ' ', text)
-        tokens = [token.strip() for token in text.split() if token.strip()]
-        return tokens
+        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        return list(filter(None, map(str.strip, text.split())))
 
     def preprocess_query(self, query: str, expand_query: bool = True) -> List[str]:
         """
@@ -153,6 +152,12 @@ class TextSearch:
 
         return tokens
 
+
+    def combine_scores(self, bm25_score: float, semantic_score: float) -> float:
+        """Combine BM25 and semantic scores into a single score"""
+        weights = {'bm25': 0.5, 'semantic': 0.5}
+        return weights['bm25'] * bm25_score + weights['semantic'] * semantic_score
+
     def search(self,
                query: str,
                min_score: float = -30,
@@ -175,7 +180,7 @@ class TextSearch:
             tokenized_query = self.preprocess_query(query, expand_query=use_fuzzy)
 
             if not tokenized_query:
-                logging.warning("Empty query after preprocessing")
+                logging.warning('Empty query after preprocessing')
                 return []
 
             # Get BM25 scores
@@ -192,7 +197,7 @@ class TextSearch:
                     result = {
                         'content': doc['content'],
                         'metadata': doc['metadata'],
-                        'score': float(scores[idx]),
+                        'bm25_score': float(scores[idx]),
                         'document_id': doc['id'],
                         'position': idx,
                         'filename': doc.get('filename', ''),
@@ -212,11 +217,30 @@ class TextSearch:
 
                     results.append(result)
 
-            return results
+            results = self.rerank_with_semantics(query, results)
+
+            for result in results:
+                result['score'] = self.combine_scores(
+                    bm25_score=result['bm25_score'],
+                    semantic_score=result.get('semantic_score')
+                )
+
+            return sorted(results, key=lambda x: x['score'], reverse=True)[:self.top_k]
 
         except Exception as e:
-            logging.error(f"Error during search: {str(e)}")
+            logging.error(f'Error during search: {str(e)}')
             raise
+
+    def rerank_with_semantics(self, query: str, results: List[Dict[str, Union[str, float]]]) -> List[Dict[str, Union[str, float]]]:
+        """Rerank search results using Sentence-BERT embeddings"""
+        query_embedding = self.embedder.encode([query])
+        doc_embeddings = self.embedder.encode([result['content'] for result in results])
+        cosine_similarities = cosine_similarity(query_embedding, doc_embeddings).flatten()
+
+        for i, result in enumerate(results):
+            result['semantic_score'] = float(cosine_similarities[i])
+
+        return sorted(results, key=lambda x: x['semantic_score'], reverse=True)
 
     def get_document_by_id(self, doc_id: str) -> Dict:
         """
@@ -249,7 +273,6 @@ class TextSearch:
             'has_metadata': all('metadata' in doc for doc in self.documents),
             'fuzzy_similarity_threshold': self.min_similarity
         }
-
 
     def get_word_suggestions(self, word: str, num_suggestions: int = 3, min_word_length: int = 3) -> List[Dict[str, Union[str, float]]]:
         """
@@ -404,7 +427,7 @@ class TextSearch:
         results = self.suggest_and_search(clean_query, min_score)
 
         suggested_query = None
-        suggestion_text = ""
+        suggestion_text = ''
 
         if results['has_suggestions']:
             query_tokens = self._tokenize(clean_query)
@@ -476,15 +499,15 @@ class TextSearch:
             'search_results': search_results
         }
 
-
 if __name__ == "__main__":
-
-    index_path = "/Users/shuwenwang/Documents/dev/uiuc/search-engine/index_data/d7be9b28-2285-4b15-a6b2-5443de534774.pkl"
+    index_path = '../index_data/72127052-a40c-4822-924e-bcff99071832.pkl'
+    query = 'storm'
+    # query = 'the the the a so'
 
     # Initialize the search
     searcher = TextSearch(index_path=index_path)
 
     # Perform a search
-    results = searcher.search_with_suggestions("whta is padas, hw ues it?")
+    results = searcher.search_with_suggestions(query)
     print(results)
 

@@ -1,3 +1,5 @@
+# This environment requires Python 3.11.6
+
 Flask==3.0.3
 
 flask-cors==5.0.0
@@ -12,6 +14,11 @@ flask-socketio==5.4.1
 eventlet==0.37.0
 gunicorn==23.0.0
 
+numpy>=1.25,<2.0
+sentence-transformers==3.3.0
+rapidfuzz==3.10.1
+torch==2.5.1
+
 ## text clustering
 pandas==2.2.3
 scikit-learn==1.5.2
@@ -21,6 +28,3 @@ gensim==4.3.3
 
 ## text summarization
 networkx==3.4.2
-
-## fuzzy search
-RapidFuzz==3.10.1
