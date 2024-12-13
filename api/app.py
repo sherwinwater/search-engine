@@ -13,6 +13,8 @@ from threading import Lock
 from urllib.parse import urlparse
 from datetime import datetime
 
+# This section right here was throwing errors on my machine due to folder indexing referentially.
+
 from db.database import SearchEngineDatabase
 from service.text_search import TextSearch
 from service.thread_manager import ThreadManager
@@ -35,13 +37,15 @@ CORS(app, resources={
 flask_env = os.getenv('FLASK_ENV', 'development')
 async_mode = 'eventlet' if flask_env == 'production' else 'threading'
 
+# Fairly standard socketIO call.
+
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode=async_mode,  # threading for development, useing eventlet for production
     logger=True,
     engineio_logger=True,
-    ping_timeout=60,
+    ping_timeout=60, # Interesting setting here.
     ping_interval=25,
     max_http_buffer_size=1e8,
     manage_session=False
@@ -50,21 +54,17 @@ socketio = SocketIO(
 log_lock = Lock()
 socket_handler = SocketIOLogHandler.init_handler(socketio)
 logger = setup_logging(__name__)
-
 thread_manager = ThreadManager()
-
 active_connections = {}
-
 
 @socketio.on('connect')
 def handle_connect():
     sid = request.sid
     active_connections[sid] = set()  # Initialize empty set for room membership
-    logger.info(f'Client connected: {sid}')
-
+    logger.info(f'Client connected: {sid}') # Standard enough logging style.
 
 @socketio.on('join')
-def handle_join(task_id):
+def handle_join(task_id): # Interesting examples of socketio.on calls.
     sid = request.sid
     try:
         join_room(task_id)
@@ -72,8 +72,7 @@ def handle_join(task_id):
         logger.info(f'Client {sid} joined room {task_id}')
         socketio.emit('status', {'message': f'Joined room {task_id}'}, room=task_id)
     except Exception as e:
-        logger.error(f'Error joining room: {str(e)}')
-
+        logger.error(f'Error joining room: {str(e)}') # I would not know this str conversion is needed here.
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -86,11 +85,9 @@ def handle_disconnect():
         del active_connections[sid]
     logger.info(f'Client disconnected: {sid}')
 
-
 def emit_log(task_id, message):
     """Utility function to emit logs to a specific task room"""
     socketio.emit('log_message', {'message': message}, room=task_id)
-
 
 @app.route("/health")
 def home():
@@ -101,26 +98,25 @@ def home():
     }
     return jsonify(data)
 
-
 @app.route('/api/scrape_web', methods=['GET'])
 def scrape_web():
     """Start web scraping task."""
     db = SearchEngineDatabase()
     url = request.args.get('url')
 
-    if not url:
+    if not url: # Mm interesting. Not sure I know how this works.
         return jsonify({
             "error": "URL parameter is required"
         }), 400
 
     # Validate URL format
-    if not validators.url(url):
+    if not validators.url(url): # OK
         return jsonify({
             "error": f"Invalid URL format: {url}"
         }), 400
 
     existing_task = db.get_web_scraping_data_by_url(url)
-    if existing_task:
+    if existing_task: # This is sharp looking code... but what if we want to do it anyways? Would think in code review here maybe give an even further option to override here and just redo it anyways in the case that the website was updated in the interim since we last scraped it or something.
         return jsonify({
             "task_id": existing_task['task_id'],
             "message": "URL was already scraped"
@@ -151,7 +147,6 @@ def scrape_web():
         "status_endpoint": f"/scrape_status/{task_id}"
     }), 202
 
-
 @app.route('/api/scrape_status/<task_id>', methods=['GET'])
 def get_scrape_web_status(task_id):
     """Get the status of a scraping task."""
@@ -174,7 +169,6 @@ def get_scrape_web_status(task_id):
         return jsonify(scraper)
     finally:
         db.close()
-
 
 @app.route('/api/build_text_index/<task_id>', methods=['GET'])
 def build_text_index(task_id):
@@ -207,7 +201,6 @@ def build_text_index(task_id):
     finally:
         db.close()
 
-
 @app.route('/api/text_indexes', methods=['GET'])
 def get_all_building_text_index():
     """Get the status of a scraping task."""
@@ -218,7 +211,6 @@ def get_all_building_text_index():
         return jsonify(text_indexes), 200
     finally:
         db.close()
-
 
 @app.route('/api/build_text_index/local', methods=['GET'])
 def build_text_index_with_local_data():
@@ -254,10 +246,9 @@ def build_text_index_with_local_data():
             "error": str(e)
         }), 500
 
-
 @app.route('/api/build_text_index_status/<task_id>', methods=['GET'])
 def get_build_text_index_status(task_id):
-    """Get the status of a scraping task."""
+    """Get the status of a scraping task.""" # This style of comment description works OK.
     db = SearchEngineDatabase()
     try:
         status = db.get_building_text_index_status(task_id)
@@ -269,7 +260,6 @@ def get_build_text_index_status(task_id):
         return jsonify(status)
     finally:
         db.close()
-
 
 @app.route('/api/clustering_status/<task_id>', methods=['GET'])
 def get_clustering_status(task_id):
@@ -324,7 +314,6 @@ def get_clustering_status(task_id):
     finally:
         db.close()
 
-
 @app.route('/api/text_index/<task_id>', methods=['GET'])
 def get_build_text_index_by_task_id(task_id):
     db = SearchEngineDatabase()
@@ -369,7 +358,6 @@ def get_build_text_index_by_task_id(task_id):
     finally:
         db.close()
 
-
 @app.route('/api/text_index_status_by_url', methods=['POST'])
 def get_text_index_status_by_url():
     """Get the status of a scraping task."""
@@ -387,7 +375,6 @@ def get_text_index_status_by_url():
         return jsonify(status), 200
     finally:
         db.close()
-
 
 @app.route('/api/search_text/<task_id>', methods=['GET'])
 def search_text(task_id):
@@ -446,7 +433,6 @@ def search_text(task_id):
             "error": str(e)
         }), 500
 
-
 @app.route('/api/build_index_by_url', methods=['POST'])
 def build_index_by_url():
     try:
@@ -470,7 +456,6 @@ def build_index_by_url():
                 root_dir = os.path.dirname(current_dir)
                 abs_destination_path = os.path.join(root_dir, 'scraped_data', task_id)
                 os.makedirs(abs_destination_path, exist_ok=True)
-
                 thread_manager.start_pipeline(url, abs_destination_path, task_id, max_pages)
 
             # Return immediately with status
@@ -487,7 +472,6 @@ def build_index_by_url():
     except Exception as e:
         logger.error(f"Error initiating processing: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
 
 @app.route('/api/kill/<task_id>', methods=['POST'])
 def kill_process(task_id: str):
@@ -523,7 +507,7 @@ def kill_process(task_id: str):
         return jsonify({
             "task_id": task_id,
             "status": "cancelling",
-            "message": "Cancellation and cleanup sequence initiated"
+            "message": "Cancellation and cleanup sequence initiated" # OK message here.
         })
 
     except Exception as e:
@@ -557,7 +541,6 @@ def delete_task(task_id: str):
     except Exception as e:
         logger.error(f"Error deleting task: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
 
 @app.route('/api/search_url', methods=['POST'])
 def search_url():
@@ -618,11 +601,10 @@ def search_url():
             "error": str(e)
         }), 500
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='0.0.0.0')
-    parser.add_argument('--port', type=int, default=5009)
+    parser.add_argument('--host', default='0.0.0.0') # Eh line here.
+    parser.add_argument('--port', type=int, default=5009) # Also an eh line here I think.
     args = parser.parse_args()
 
     socketio.run(
